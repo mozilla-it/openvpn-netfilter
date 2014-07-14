@@ -12,6 +12,7 @@ install:
 	$(INSTALL) -m600 netfilter_openvpn.conf.inc $(DESTDIR)/etc/netfilter_openvpn.conf
 	$(INSTALL) -m755 scripts/vpn-fw-find-user.sh $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m755 scripts/vpn-netfilter-cleanup-ip.sh $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m440 sudoers.inc /etc/sudoers.d/openvpn-netfilter
 
 clean:
 	rm -f *.o
