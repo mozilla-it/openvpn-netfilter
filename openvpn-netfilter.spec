@@ -36,6 +36,7 @@ make install DESTDIR=%{buildroot}
 
 %files
 %defattr(0755,root,root)
+%{prefix}/lib/openvpn/plugins/netfilter_openvpn.sh
 %{prefix}/lib/openvpn/plugins/netfilter_openvpn.py
 %{prefix}/lib/openvpn/plugins/netfilter_openvpn.pyc
 %{prefix}/lib/openvpn/plugins/netfilter_openvpn.pyo
