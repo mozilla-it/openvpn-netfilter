@@ -1,3 +1,0 @@
-[submodule "mozdef"]
-	path = mozdef
-	url = https://github.com/gdestuynder/mozdef_lib
