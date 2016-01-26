@@ -1,19 +1,22 @@
 INSTALL	:= install
 DESTDIR	:= /
 PREFIX	:= /usr
+PACKAGE := openvpn-netfilter
+VERSION := 1.0.0
 
 all:
 	./setup.py build
 
-#This replaces the install target, which is kept for legacy compat purposes, or if you want to use a real RPM file instead of fpm.
 pyinstall:
 	./setup.py install
 
 rpm:
-	fpm -s python -t rpm -d mozdef_client ./setup.py
+	$(MAKE) DESTDIR=./tmp install
+	fpm -s dir -t rpm -d mozdef_client -n $(PACKAGE) -v $(VERSION) -C tmp
 
 deb:
-	fpm -s python -t deb ./setup.py
+	$(MAKE) DESTDIR=./tmp install
+	fpm -s dir -t deb -d mozdef_client -n $(PACKAGE) -v $(VERSION) -C tmp
 
 pypi:
 	python setup.py sdist check upload --sign
@@ -35,3 +38,8 @@ clean:
 	rm -f *.so
 	rm -f *.pyc
 	rm -rf __pycache__
+	rm -rf dist sdist build
+	rm -rf openvpn_netfilter.egg-info
+	rm -rf tmp
+	rm -rf *.rpm
+	rm -rf *.deb
