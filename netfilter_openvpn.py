@@ -44,7 +44,11 @@ import ldap
 import fcntl
 import time
 import signal, errno
-import mozdef
+try:
+    import mozdef
+except ImportError:
+    import mozdef_client as mozdef
+
 from contextlib import contextmanager
 import imp
 
