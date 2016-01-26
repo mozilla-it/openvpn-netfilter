@@ -3,6 +3,20 @@ DESTDIR	:= /
 PREFIX	:= /usr
 
 all:
+	./setup.py build
+
+#This replaces the install target, which is kept for legacy compat purposes, or if you want to use a real RPM file instead of fpm.
+pyinstall:
+	./setup.py install
+
+rpm:
+	fpm -s python -t rpm -d mozdef_client ./setup.py
+
+deb:
+	fpm -s python -t deb ./setup.py
+
+pypi:
+	python setup.py sdist check upload --sign
 
 install:
 	mkdir -p $(DESTDIR)$(PREFIX)/lib/openvpn/plugins
