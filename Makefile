@@ -12,11 +12,11 @@ pyinstall:
 
 rpm:
 	$(MAKE) DESTDIR=./tmp install
-	fpm -s dir -t rpm -d mozdef_client -n $(PACKAGE) -v $(VERSION) -C tmp
+	fpm -s dir -t rpm -d python-mozdef_client -n $(PACKAGE) -v $(VERSION) -C tmp etc usr
 
 deb:
 	$(MAKE) DESTDIR=./tmp install
-	fpm -s dir -t deb -d mozdef_client -n $(PACKAGE) -v $(VERSION) -C tmp
+	fpm -s dir -t deb -d python-mozdef_client -n $(PACKAGE) -v $(VERSION) -C tmp etc usr
 
 pypi:
 	python setup.py sdist check upload --sign
