@@ -42,8 +42,7 @@ import os
 import sys
 import ldap
 import fcntl
-import time
-import signal, errno
+import signal
 try:
     import mozdef
 except ImportError:
@@ -61,7 +60,7 @@ for cfg in cfg_path:
 	except:
 		pass
 
-if config == None:
+if config is None:
 	print("Failed to load config")
 	sys.exit(1)
 
@@ -229,7 +228,7 @@ def load_ldap():
 				ulist.append(u.split('=')[1].split(',')[0])
 			except:
 				mdmsg.send(summary='Failed to load user from LDAP', details={'user': u, 'group': group})
-		if grp[1].has_key('ipHostNumber'):
+		if 'ipHostNumber' in grp[1]:
 			hlist = grp[1]['ipHostNumber']
 		schema[group] = {'cn': ulist, 'networks': hlist}
 	return schema
@@ -401,7 +400,7 @@ def main():
 	vpn_ip = os.environ.get('address', '127.0.0.1')
 	client_port = os.environ.get('untrusted_port', '0')
 	usercn = os.environ.get('common_name', None)
-	if usercn == None:
+	if usercn is None:
 		usercn = os.environ.get('username', None)
 
 	if len(sys.argv) < 2:
@@ -429,7 +428,7 @@ def main():
 if __name__ == "__main__":
 #	we only authorize one script execution at a time
 	lockfd = wait_for_lock()
-	if (lockfd == None):
+	if lockfd is None:
 		sys.exit(1)
 
 	if main():
