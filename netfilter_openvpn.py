@@ -60,6 +60,9 @@ for cfg in cfg_path:
 		config = imp.load_source('config', cfg)
 	except:
 		pass
+	else:
+		# use first config file found
+		break
 
 if config == None:
 	print("Failed to load config")
