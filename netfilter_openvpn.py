@@ -340,7 +340,7 @@ def kill_block_hack(usersrcip, usercn):
 		This function allows traffic through.
 	"""
 	try:
-		iptables('-D INPUT -s ' + usersrcip + ' -j DROP')
+		iptables('-D FORWARD -s ' + usersrcip + ' -j DROP')
 	except:
 		mdmsg.send(summary='Failed to delete blocking rule, potential security issue', severity='CRITICAL',
 		details={'vpnip': usersrcip, 'user': usercn})
