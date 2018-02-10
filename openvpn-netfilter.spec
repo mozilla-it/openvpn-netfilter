@@ -4,7 +4,7 @@
 Name:           openvpn-netfilter
 Version:        1.0
 Release:        2%{?dist}
-Packager:       Ed Lim <limed@mozilla.com>
+Packager:       Greg Cox <gcox@mozilla.com>
 Summary:        OpenVPN netfilter plugin
 
 BuildArch:	noarch
