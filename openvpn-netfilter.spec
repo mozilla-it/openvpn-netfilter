@@ -2,8 +2,8 @@
 %define prefix  /usr
 
 Name:           openvpn-netfilter
-Version:        1.0
-Release:        2%{?dist}
+Version:        1.0.1
+Release:        1%{?dist}
 Packager:       Greg Cox <gcox@mozilla.com>
 Summary:        OpenVPN netfilter plugin
 
@@ -50,8 +50,21 @@ make install DESTDIR=%{buildroot}
 %{prefix}/lib/openvpn/plugins/netfilter_openvpn.py
 %{prefix}/lib/openvpn/plugins/netfilter_openvpn.pyc
 %exclude %{prefix}/lib/openvpn/plugins/netfilter_openvpn.pyo
+%if %{rhel} >=7
+%attr(0644,root,root)/etc/systemd/system/openvpn@.service.d/only-kill-process.conf
+%else
+%exclude /etc/systemd/system/openvpn@.service.d/only-kill-process.conf
+%endif
 %attr(0440,root,root)/etc/sudoers.d/openvpn-netfilter
 %attr(0640,root,openvpn) %config(noreplace) %verify(not md5 size mtime)/etc/netfilter_openvpn.conf
+
+%if %{rhel} >=7
+%post
+    systemctl daemon-reload >/dev/null 2>&1
+
+%postun
+    systemctl daemon-reload >/dev/null 2>&1
+%endif
 
 %files utils
 %defattr(0755,root,root)
