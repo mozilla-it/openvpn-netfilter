@@ -12,9 +12,9 @@ SUDO=/usr/bin/sudo
 IPTABLES=/sbin/iptables
 
 if [[ ${operation} == "delete" ]]; then
-	${SUDO} ${IPTABLES} -D INPUT -s ${address} -j DROP
+	${SUDO} ${IPTABLES} -D FORWARD -s ${address} -j DROP
 else
-	${SUDO} ${IPTABLES} -I INPUT -s ${address} -j DROP || {
+	${SUDO} ${IPTABLES} -I FORWARD -s ${address} -j DROP || {
 		echo "Failed to run initial iptables command"
 		exit 127
 	}
