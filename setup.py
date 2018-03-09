@@ -14,7 +14,7 @@ def read(fname):
 setup(
     name = "openvpn-netfilter",
         py_modules = ['netfilter_openvpn'],
-        version = "1.0.0",
+        version = "1.0.1",
         author = "Guillaume Destuynder",
         author_email = "gdestuynder@mozilla.com",
         description = ("A plugin to OpenVPN to use netfilter/iptables rules per connected user"),

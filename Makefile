@@ -2,7 +2,7 @@ INSTALL	:= install
 DESTDIR	:= /
 PREFIX	:= /usr
 PACKAGE := openvpn-netfilter
-VERSION := 1.0.0
+VERSION := 1.0.1
 
 all:
 	./setup.py build
@@ -24,6 +24,7 @@ pypi:
 install:
 	mkdir -p $(DESTDIR)$(PREFIX)/lib/openvpn/plugins
 	mkdir -p $(DESTDIR)/etc/openvpn
+	mkdir -p $(DESTDIR)/etc/systemd/system/openvpn@.service.d
 	mkdir -p $(DESTDIR)/etc/sudoers.d
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m755 netfilter_openvpn.py $(DESTDIR)$(PREFIX)/lib/openvpn/plugins
@@ -32,6 +33,7 @@ install:
 	$(INSTALL) -m755 scripts/vpn-fw-find-user.sh $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m755 scripts/vpn-netfilter-cleanup-ip.sh $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m440 sudoers.inc $(DESTDIR)/etc/sudoers.d/openvpn-netfilter
+	$(INSTALL) -m644 systemd-only-kill-process.conf $(DESTDIR)/etc/systemd/system/openvpn@.service.d/only-kill-process.conf
 
 clean:
 	rm -f *.o
