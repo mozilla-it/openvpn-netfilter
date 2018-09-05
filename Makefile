@@ -18,6 +18,12 @@ deb:
 	$(MAKE) DESTDIR=./tmp install
 	fpm -s dir -t deb -d python-mozdef_client -n $(PACKAGE) -v $(VERSION) -C tmp etc usr
 
+pep8:
+	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -type f -name '*.py' -exec pep8 {} \;
+
+pylint:
+	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -type f -name '*.py' -exec pylint -r no --disable=locally-disabled {} \;
+
 pypi:
 	python setup.py sdist check upload --sign
 
