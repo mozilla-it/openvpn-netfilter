@@ -1,4 +1,10 @@
-#! /usr/bin/env bash
+#! /usr/bin/env python
+# pylint: disable=invalid-name
+# This is a script, not a module
+"""
+    Script to execute the delete_chain function and remove leftover
+    iptables/ipset debris as needed.
+"""
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
 # The contents of this file are subject to the Mozilla Public License Version
@@ -19,7 +25,7 @@
 # the Initial Developer. All Rights Reserved.
 #
 # Contributor(s):
-# jvehent@mozilla.com (ulfr)
+# gcox@mozilla.com
 #
 # Alternatively, the contents of this file may be used under the terms of
 # either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -32,17 +38,41 @@
 # and other provisions required by the GPL or the LGPL. If you do not delete
 # the provisions above, a recipient may use your version of this file under
 # the terms of any one of the MPL, the GPL or the LGPL.
-if [ -z $1 ]; then
-    /bin/echo "usage: $0 <user ip>"
-    /bin/echo "find the firewall rules for a specific VPN IP and delete them all"
-    exit 1
-fi
-userip="$1"
-TMP="$(mktemp)-$userip"
-/sbin/iptables-save|/bin/grep -E "\-(s|d) $userip/32"|/bin/sed -e "s/-A/\/sbin\/iptables -D/" > $TMP
-/bin/echo "/sbin/iptables -F $userip" >> $TMP
-/bin/echo "/sbin/iptables -X $userip" >> $TMP
-/bin/echo "/usr/sbin/ipset --destroy $userip" >> $TMP
-#echo "Stored $(wc -l $TMP|awk '{print $1}') cleanup rules in $TMP"
-/bin/bash $TMP
-/bin/rm "$TMP"
+
+import sys
+import netfilter_openvpn
+sys.dont_write_bytecode = True
+
+
+def main():
+    """
+        A scripting failure can leave behind debris.
+        This script aims to help clean up after accidents in testing.
+        Uses the locking mechanism of the library, so should be safe
+        to use even on a production system.
+    """
+    _usage = ('USAGE: {program} user_ip\n'
+              'find the firewall rules for a '
+              'specific VPN IP and delete them all')
+    if len(sys.argv) < 2:
+        print(_usage.format(program=sys.argv[0]))
+        return False
+    userip = sys.argv[1]
+
+    nf_object = netfilter_openvpn.NetfilterOpenVPN()
+    nf_object.set_targets(user=None, client_ip=userip)
+
+    if not nf_object.acquire_lock():
+        # never obtained a lock, get out
+        return False
+
+    chain_work_status = nf_object.del_chain()
+
+    nf_object.free_lock()
+    return chain_work_status
+
+if __name__ == "__main__":
+    if main():
+        sys.exit(0)
+    else:
+        sys.exit(1)

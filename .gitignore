@@ -1,4 +1,13 @@
-# from https://github.com/github/gitignore/blob/master/Python.gitignore
+# Our config file:
+netfilter_openvpn.conf
+# RPMs that get built
+openvpn-netfilter-*.rpm
+python-openvpn-netfilter-*.rpm
+# The upstream library config files, just in case we're testing locally.
+iamvpnlibrary.conf
+mozdef_client_config.conf
+
+# Imported from https://github.com/github/gitignore/raw/master/Python.gitignore
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -46,6 +55,7 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+.pytest_cache/
 
 # Translations
 *.mo
@@ -53,9 +63,8 @@ coverage.xml
 
 # Django stuff:
 *.log
-.static_storage/
-.media/
 local_settings.py
+db.sqlite3
 
 # Flask stuff:
 instance/
@@ -72,6 +81,10 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
 
 # pyenv
 .python-version
@@ -103,9 +116,11 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+.dmypy.json
+dmypy.json
 
 
-# from https://github.com/github/gitignore/blob/master/Global/Vim.gitignore
+# Imported from https://github.com/github/gitignore/raw/master/Global/Vim.gitignore
 # swap
 [._]*.s[a-v][a-z]
 [._]*.sw[a-p]

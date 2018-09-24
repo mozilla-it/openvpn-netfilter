@@ -1,0 +1,31 @@
+[openvpn-netfilter]
+# This section contains tweakable items that you may / may not need.
+# If the defaults from the sample are sufficient, then you can get by
+# without any config file for netfilter_openvpn.  However, mozdef and
+# iamvpnlibrary will need theirs.
+#
+# Path to executables
+; iptables_executable = /sbin/iptables
+; ipset_executable = /usr/sbin/ipset
+
+# Script locking, so all work completes atomically with respect to
+# other invocations of this script
+# What external lock file to use:
+; LOCKPATH = /var/run/openvpn_netfilter.lock
+# Number of seconds (integer) per try to lock the file
+; LOCKWAITTIME = 2
+# Number of times to try to lock the file
+; LOCKRETRIESMAX = 10
+
+[testing]
+# The 'testing' section contains information for the unit tests.
+# A production instance can/should empty this.
+#
+# A test IP for someone connecting in.
+# You want this to be something that would never interfere with your
+# openvpn server or test box.  For demo purposes, I leave a Class E
+# reserved address here to avoid collisions.
+client_ip = 240.1.2.3
+# We also need a username for someone who's valid / would get ACLs.
+# As a reminder, this is pulled in via iamvpnlibrary methods.
+client_username = someone@yourcompany.com

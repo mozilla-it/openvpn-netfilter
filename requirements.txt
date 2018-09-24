@@ -1,1 +1,2 @@
-mozdef_client==1.0.6
+iamvpnlibrary>=0.8.3
+mozdef_client_config

@@ -1,69 +1,46 @@
 openvpn-netfilter
 =================
 
-Per VPN user network ACLs using Netfilter and OpenVPN.
+Per-VPN-user network ACLs using Netfilter and OpenVPN.
 
 Setup
 =====
 
-While the script is fast, it still hangs OpenVPN for a second while running, which may be felt by VPN users.
-To minimize the impact the script blocks all connections then fork off and return control to openvpn.
-The fork finishes the rule setup.
+There are effectively two packages to this repo.
+* python-openvpn-netfilter - a python library that does all of the filtering
+* openvpn-netfilter - a series of scripts and configurations to allow integration with openvpn.
 
+openvpn integration:
 .. code::
 
    learn-address /usr/lib/openvpn/plugins/netfilter_openvpn.sh
 
-If using LDAP for user authentication, add this to the OpenVPN server configuration:
+This shell wrapper makes a sudo call to one of the scripts, ```netfilter_openvpn_sync.py```
+While these scripts are fast, there are calls to IAM systems that may hang, and that would be felt by all VPN users.
+To minimize that impact, the synchronous script blocks all connections from the client IP, forks a call to ```netfilter_openvpn_async.py```, and returns control to openvpn.
+The forked ```netfilter_openvpn_async.py``` then finishes the rule setup.
 
-.. code::
+Change the settings in /etc/netfilter_openvpn.conf if needed.
+Make sure that the paths of the 'iptables' and 'ipset' are correct for your OS.  Somewhat-conventional defaults are present without a config.
 
-    username-as-common-name
-
-For any OpenVPN server configuration, also add this (or a sudo wrapper to this script, if needed. You may also use capabilities.):
-
-.. code::
-
-    #This is necessary so that openvpn delete the ip after 20s, assuming the client has gone away
-    #This may not be needed for TCP VPNs since the VPN knows when the client has gone away. (have not tested)
-    #For the same reason, remember to kill a client for at least 20s, or SIGUSR1 openvpn if you're changing ACLs for that client.
-    keepalive 10 20
-
-Change the settings in /etc/openvpn/netfilter_openvpn.conf.
-
-In general, you'll want to store the rules in /etc/openvpn/netfilter/rules/* and have a list of files such as "vpn_teamA.rules".
-Users belonging to the LDAP group name teamA will get those rules.
-You'll also want to have /etc/openvpn/netfilter/users/* for per user rules.
-Likewise, make sure that the paths of the 'iptables', 'ipset', and 'vpn-netfilter-cleanup-ip.sh' commands are correct for your system.
-
-Don't forget to push the proper routing rules for the network/IPs you allow.
-
-Rule format
-===========
-Rules are formatted as list of ips or networks (anything netfilter understands for an address or network really), such as:
-
-.. code::
-
-    # Lines starting with a # sign can be used for comments
-    127.0.0.1
-    127.0.0.1/27
-    # Obviously you might want to use slightly more useful rules ;-)
+Obviously this filtering depends on having proper client routes for the network/IPs you allow, so consider the routes.
 
 Script logic
 ============
 
-learn-address is an OpenVPN hook called when the remote client is being set an IP address at the VPN server side. It calls the netfilter script, which in turn will load the netfilter (iptables) rules for that IP address, per given cn name (cn name is the username in the certificate, or the LDAP user name).
+learn-address is an OpenVPN hook called when the remote client is allocated an IP address by the VPN server side.  Given the user and now-allocated client IP, we load the netfilter (iptables/ipset) rules for that user and apply them to that client IP address.
 
 If the script fails for any reason, OpenVPN will deny packets to come through.
 
-When a user successfully connects to OpenVPN, netfilter.py will create a set for firewall rules for this user. The custom rules are added into a new chain named after the VPN IP of the user:
+When a user successfully connects to OpenVPN, netfilter.py will create a set for firewall rules for this user.
+The custom rules are added into a new chain named after the VPN IP of the user.
 
 .. code::
 
     Chain 172.16.248.50 (3 references)
      pkts bytes target     prot opt in     out     source               destination
      5925  854K ACCEPT     all  --  *      *       0.0.0.0/0            0.0.0.0/0           ctstate ESTABLISHED /* ulfr at 172.16.248.50 */
-      688 46972 ACCEPT     all  --  *      *       172.16.248.50        0.0.0.0/0           match-set 172.16.248.50 dst /* ulfr groups: vpn_caribou;vpn_pokemon;vpn_ninjas;*/
+      688 46972 ACCEPT     all  --  *      *       172.16.248.50        0.0.0.0/0           match-set 172.16.248.50 dst /* ulfr groups: vpn_caribou;vpn_pokemon;vpn_ninjas; */
        24  2016 LOG        all  --  *      *       0.0.0.0/0            0.0.0.0/0           /* ulfr at 172.16.248.50 */ LOG flags 0 level 4 prefix `DROP 172.16.248.50'
        24  2016 DROP       all  --  *      *       0.0.0.0/0            0.0.0.0/0           /* ulfr at 172.16.248.50 */
 
@@ -82,7 +59,7 @@ A jump target is added to INPUT, OUTPUT and FORWARD to send all traffic originat
 
 You'll notice the comments are there for ease of troubleshooting, you can grep through "iptables -L -n" and find out which user or group has access to what easily.
 
-To reduce the amount of rules created, when the LDAP ACLs only contains a list of destination subnets, these subnets are added into an IPSet. The IPSet is named after the VPN IP of the user.
+To reduce the amount of rules created, when a user ACL only contains a list of destination subnets (no ports), these subnets are added into an IPSet.  The IPSet is named after the VPN IP of the user.
 
 .. code::
 
@@ -102,10 +79,13 @@ Maintenance
 ===========
 You can list the rules and sets of a particular user with the script named 'vpn-fw-find-user.sh'.
 
-You can delete all of the rules and sets of a given VPN IP using the script named 'vpn-netfilter-cleanup-ip.sh'.
+You can delete all of the rules and sets of a given VPN IP using the script named 'vpn-netfilter-cleanup-ip.py'.
 
-Upgrading
-=========
+Updates
+=======
 
-On rule upgrades, start the script 'vpn-netfilter-cleanup-ip.sh' within 'netfilter_openvpn.sh' until all rules are
-upgraded. You may also do this all the time but this has a performance cost associated.
+The async script may be invoked by hand to refresh a user's rules while they are still connected / so they do not have to reconnect to the VPN
+
+.. code::
+
+       netfilter_openvpn_async.py update 172.16.248.50 ulfr

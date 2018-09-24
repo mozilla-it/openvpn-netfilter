@@ -32,25 +32,26 @@
 # and other provisions required by the GPL or the LGPL. If you do not delete
 # the provisions above, a recipient may use your version of this file under
 # the terms of any one of the MPL, the GPL or the LGPL.
-if [ -z $1 ]; then
+if [ -z "$1" ]; then
     echo "usage: $0 <user cn>"
     echo "search for a vpn user that matches the input, and display all firewall rules"
     exit 1
 fi
 usercn=$1
-useriplist=$(iptables -L -v -n |grep "$usercn"|grep match-set|awk '{print $11}')
-groupslist=$(echo $(iptables -L -v -n |grep "$usercn"|grep match-set|awk '{print $16}')|tr ";" "\n")
+useriplist=$(iptables -L -v -n | grep "$usercn" | grep match-set | awk '{print $11}')
+groupslist=$(iptables -L -v -n | grep "$usercn" | grep match-set | awk '{print $16}' | tr ";" "\\n")
+# FIXME grab not by number?
 
 for userip in $useriplist; do
-    echo -e "\n--- $usercn has IP $userip ---"
-    echo -e "ldap groups:\n$(for g in $groupslist; do echo "- $g";done)"
-    echo -e "\n--- IPTABLES RULES ---"
+    echo -e "\\n--- $usercn has IP $userip ---"
+    echo -e "ldap groups:\\n$(for g in $groupslist; do echo "- $g";done)"
+    echo -e "\\n--- IPTABLES RULES ---"
     for chain in INPUT OUTPUT FORWARD; do
-        iptables -L $chain -v -n |grep -E "Chain $chain|$userip"
+        iptables -L $chain -v -n | grep -E "Chain $chain|$userip"
     done
-    iptables -L $userip -v -n
+    iptables -L "$userip" -v -n
     echo
-    echo -e "\n--- IPSET HASH TABLE ---"
-    ipset --list $userip
-    echo -e "--- end of $usercn $userip ---\n\n"
+    echo -e "\\n--- IPSET HASH TABLE ---"
+    ipset --list "$userip"
+    echo -e "--- end of $usercn $userip ---\\n\\n"
 done

@@ -2,7 +2,7 @@ include README.rst
 include TODO
 include requirements.txt
 include LICENSE
-include netfilter_openvpn.conf.inc
+include netfilter_openvpn.conf.sample
 include sudoers.inc
-include netfilter_openvpn.sh
+recursive-include wrappers *
 recursive-include scripts *
