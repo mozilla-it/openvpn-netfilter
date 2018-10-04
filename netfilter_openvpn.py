@@ -409,7 +409,8 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             comment=username_comment, chain=chain), True)
         log_drops_rule = ('-A {chain} '
                           '{comment} '
-                          '-j LOG --log-prefix "DROP {user}"')
+                          '-j LOG --log-prefix "DROP {user} "')
+        # log-prefix needs a space at the end              ^
         self.iptables(log_drops_rule.format(
             comment=username_comment,
             chain=chain,
