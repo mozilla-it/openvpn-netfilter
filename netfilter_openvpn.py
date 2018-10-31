@@ -371,8 +371,10 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         # First thing, create empty placeholders:
         self.iptables('-N ' + chain)
         self.ipset('--create ' + chain + ' hash:net')
-        # Now, iterate over the list:
-        for acl in user_acls:
+        # Now, iterate over the list, which we sort by address
+        # This assumes that all of the items in user_acls are
+        # accepts, and thus order won't matter.
+        for acl in sorted(user_acls, key=lambda acl: acl.address):
             if bool(acl.portstring):
                 protocols = ['tcp', 'udp']
             else:
