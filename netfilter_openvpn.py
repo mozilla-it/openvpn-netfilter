@@ -444,31 +444,28 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         acls = []
         _seen_nets = []
         for acl in raw_acls:
-            if acl.address in _seen_nets:
-                # This ACL's address is already accounted for.
-                continue
 
-            if acl.portstring:
-                # All portstring uses are textual and so we can't readily
-                # detect a collision.  But, these are going to be managed
-                # through iptables, and it can handle collisions/dupes.
-                # Just pass them through.  If you don't like the results
-                # then clean the source data.
-                acls.append(acl)
+            for _prev_acl in _seen_nets:
+                if acl.address in _prev_acl:
+                    # This ACL's address space is fully contained
+                    # within a rule we've already permitted.
+                    break
             else:
-                # Here, we don't have port strings.  This means ipset will
-                # be doing the work and MAN does it not like collisions.
-                for _prev_acl in _seen_nets:
-                    if acl.address in _prev_acl:
-                        # This ACL's address space is fully contained
-                        # within a rule we've already permitted.
-                        break
-                else:
-                    # We haven't seen this ACL before.  Take a note so
-                    # we don't have collisions/dupes...
+                # We have not seen this before.
+                if not acl.portstring:
+                    # When there's a portstring, the rule is always
+                    # port specific.  So we don't assume we can do anything
+                    # with it (like, you can get to blah port 80, but that
+                    # has no bearing on getting to blah port 22).  But when
+                    # portstring is missing, it refers to the whole IP range.
+                    # We add this address to our list, because it means that
+                    # future users who want to use this network already have
+                    # a rule to handle it.
                     _seen_nets.append(acl.address)
-                    # ... and then save the ACL.
-                    acls.append(acl)
+                # and at this point, append the acl to our list of things
+                # acls to pass upstream
+                acls.append(acl)
+
         return acls
 
     def chain_exists(self):

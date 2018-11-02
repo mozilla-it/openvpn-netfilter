@@ -13,7 +13,6 @@
 import unittest
 import os
 import sys
-import re
 from netaddr import IPNetwork
 sys.path.insert(1, 'iamvpnlibrary')
 sys.path.insert(1, 'mozdef_client')
@@ -146,7 +145,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         acls = self.library.get_acls_for_user()
         self.assertIsInstance(acls, list,
                               'get_acls_for_user must return a list')
-        # 5 picked at random for "someone likely has that many acls
+        # 5 picked at random for "someone likely has that many acls"
         self.assertGreater(len(acls), 5,
                            'get_acls_for_user was a too-short list?')
         acl1 = acls[0]
@@ -166,6 +165,24 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertGreaterEqual(acl1.address.size,
                                 acl2.address.size,
                                 'get_acls_for_user list was not size-sorted')
+        # All networks in the ACL should be unique, except possibly
+        # portstring collisions.
+        _seen_nets = []
+        for acl in acls:
+            # for each acl, see if this acl would be enclosed by something
+            # larger elsewhere in this list.
+            # IMPROVEME:  This test rests on the output having been sorted
+            # large-to-small, so this could be exhaustively searched.
+            for _prev_acl in _seen_nets:
+                if acl.address in _prev_acl:
+                    self.fail(('{ad} appears in the user '
+                               'acls but should have been '
+                               'caught by {pa}').format(ad=acl.address,
+                                                        pa=_prev_acl))
+                else:
+                    if not acl.portstring:
+                        _seen_nets.append(acl.address)
+        # Falling through the bottom here means we didn't fail.
 
     def test_30_iptables(self):
         """
