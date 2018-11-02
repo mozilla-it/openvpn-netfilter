@@ -13,7 +13,7 @@ pythonrpm:
 	fpm -s python -t rpm --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
     -d iptables -d ipset \
     --iteration 1 setup.py
-	@rm -rf build $(PACKAGE).egg-info
+	@rm -rf openvpn_netfilter.egg-info
 
 # FIXME: summary  description   git?
 servicerpm:
