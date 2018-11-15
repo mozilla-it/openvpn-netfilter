@@ -3,11 +3,18 @@ DESTDIR	:= /
 PREFIX	:= /usr
 PACKAGE := openvpn-netfilter
 VERSION := 1.0.2
+TEST_FLAGS_FOR_SUITE := -m unittest discover -f -s test
 
 .DEFAULT: test
-.PHONY: clean all test pep8 pylint pypi install rpm pythonrpm servicerpm
+.PHONY: all test coverage pythonrpm servicerpm rpm pep8 pylint pypi install clean
 
 all: rpm
+
+test:
+	python -B $(TEST_FLAGS_FOR_SUITE)
+
+coverage:
+	coverage run $(TEST_FLAGS_FOR_SUITE)
 
 pythonrpm:
 	fpm -s python -t rpm --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
@@ -26,9 +33,6 @@ servicerpm:
 	rm -rf ./tmp
 
 rpm: pythonrpm servicerpm
-
-test:
-	python -B -m unittest discover -f -s test
 
 pep8:
 	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -type f -name '*.py' -exec pep8 {} \;
@@ -53,9 +57,7 @@ install:
 	$(INSTALL) -m644 systemd-only-kill-process.conf $(DESTDIR)/etc/systemd/system/openvpn@.service.d/only-kill-process.conf
 
 clean:
-	rm -f *.o
-	rm -f *.so
-	rm -f *.pyc
+	rm -f $(PACKAGE)/*.pyc test/*.pyc
 	rm -rf __pycache__
 	rm -rf dist sdist build
 	rm -rf openvpn_netfilter.egg-info
