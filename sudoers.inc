@@ -1,3 +1,9 @@
+#
+# Preserve the untrusted_ip and untrusted_port variables so that the
+# netfilter scripts have access to them for reporting purposes.
+Defaults:openvpn  env_keep += untrusted_ip
+Defaults:openvpn  env_keep += untrusted_port
+#
 # This is so openvpn can call the main python script with enough permissions
 # to do iptables efforts within it.
 openvpn           ALL=NOPASSWD: /usr/lib/openvpn/plugins/netfilter_openvpn_async.py
