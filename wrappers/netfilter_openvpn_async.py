@@ -76,31 +76,48 @@ def main():
     _log = nf_object.logger
 
     if operation == 'add':
-        _log.summary = 'Login success: OpenVPN endpoint connected'
-        _log.details = {'srcip': client_public_ip,
-                        'srcport': client_port,
+        _log.summary = ('SUCCESS: VPN netfilter add upon connection for '
+                        '{}'.format(usercn))
+        _log.details = {'sourceipaddress': client_public_ip,
+                        'sourceport': client_port,
                         'vpnip': client_private_ip,
-                        'user': usercn}
+                        'username': usercn,
+                        'success': 'true'}
         _log.send()
         chain_work_status = nf_object.add_chain()
     elif operation == 'update':
-        _log.summary = 'Login success: OpenVPN endpoint re-connected'
-        _log.details = {'srcip': client_public_ip,
-                        'srcport': client_port,
+        _log.summary = ('SUCCESS: VPN netfilter add upon reconnection for '
+                        '{}'.format(usercn))
+        _log.details = {'sourceipaddress': client_public_ip,
+                        'sourceport': client_port,
                         'vpnip': client_private_ip,
-                        'user': usercn}
+                        'username': usercn,
+                        'success': 'true'}
         _log.send()
         chain_work_status = nf_object.update_chain()
     elif operation == 'delete':
-        _log.summary = 'Logout success: OpenVPN endpoint disconnected'
-        _log.details = {'vpnip': client_private_ip}
+        # There is no username here.
+        # One could be found from the chain before we delete it if we care.
+        _log.summary = ('SUCCESS: VPN netfilter deletes upon disconnect')
+        _log.details = {'vpnip': client_private_ip,
+                        'success': 'true'}
         _log.send()
         chain_work_status = nf_object.del_chain()
     else:
-        _log.summary = 'Login failure: OpenVPN unknown operation'
+        # There is no username here.
+        _log.summary = ('FAIL: VPN netfilter failure due to'
+                        'unknown operation "{}"'.format(operation))
+        _log.details = {'error': 'true',
+                        'success': 'false'}
         _log.send()
         chain_work_status = False
 
+    if nf_object.log_to_stdout:
+        print _log.syslog_convert()
+
+    # Print to stdout here because we want a local copy of the results.
+    # We could log to syslog, but that separates our files from the
+    # openvpn log to syslog.
     nf_object.free_lock()
     return chain_work_status
 

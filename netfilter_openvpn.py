@@ -116,11 +116,24 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         if _cf.has_option('openvpn-netfilter', 'LOCKRETRIESMAX'):
             self.lockretriesmax = self.configfile.getint(
                 'openvpn-netfilter', 'LOCKRETRIESMAX')
+        if (_cf.has_section('openvpn-netfilter') and
+                _cf.has_option('openvpn-netfilter', 'log_to_stdout')):
+            self.log_to_stdout = _cf.getboolean('openvpn-netfilter',
+                                                'log_to_stdout')
+        else:
+            self.log_to_stdout = True
+
         self._lock = None
         self.username = None
         self.client_ip = None
         self.logger = mozdef_client_config.ConfigedMozDefEvent()
-        self.logger.tags = ['openvpn', 'netfilter']
+        # While 'Authorization' might seem more correct (we are layering
+        # access upon a user after they have been authenticated), we are
+        # asked to put all login-related info under the category of
+        # 'Authentication'.  So, don't change this without an EIS consult.
+        self.logger.category = 'Authentication'
+        self.logger.source = 'openvpn'
+        self.logger.tags = ['vpn', 'netfilter']
         if os.geteuid() != 0:
             # Since everything in this class will modify iptables/ipset,
             # this library pretty much must run as root.
@@ -214,11 +227,13 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     # reset _lock because we don't have one.
                     self._lock = None
                     # Tell the world we failed.
-                    self.logger.summary = 'Failed to aquire lock.'
+                    self.logger.summary = ('FAIL: internal netfilter issue '
+                                           'on lock acquisition '
+                                           'of {}'.format(self.lockpath))
                     self.logger.details = {
-                        'lock_path': self.lockpath,
-                        'error': err.errno,
-                        'lock_retry_seconds': self.lockwaittime}
+                        # There is no username here
+                        'error': 'true',
+                        'success': 'false', }
                     self.logger.send()
                     break
                 retries += 1
@@ -513,11 +528,13 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     '-D FORWARD -s {ip} -j DROP >/dev/null 2>&1'.format(
                         ip=self.client_ip), True)
         except IptablesFailure:
-            self.logger.summary = ('Failed to delete blocking rule, '
+            self.logger.summary = ('FAIL: did not delete blocking rule, '
                                    'potential security issue')
-            self.logger.severity = 'CRITICAL'
+            self.logger.set_severity_from_string('CRITICAL')
             self.logger.details = {'vpnip': self.client_ip,
-                                   'user': self.username}
+                                   'error': 'true',
+                                   'username': self.username,
+                                   'success': 'false'}
             self.logger.send()
 
     def add_chain(self):
@@ -561,18 +578,22 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             # to ever clean it up except someone finding the bad setup.  And
             # to date, nobody ever has, which means this is a thin case and
             # nobody looks for it.  Log that this happened and then wipe it.
-            self.logger.summary = 'Collision of adding a VPN ACL'
+            self.logger.summary = 'FAIL: Collision of adding a VPN ACL'
             self.logger.details = {'vpnip': self.client_ip,
-                                   'user': self.username}
+                                   'error': 'true',
+                                   'username': self.username,
+                                   'success': 'false'}
             self.logger.set_severity_from_string('WARNING')
             self.logger.send()
             self.del_chain()
             # having now wiped the chain, check again:
             if self.chain_exists():
                 # It didn't delete.  Severe problem.
-                self.logger.summary = 'Undeletable VPN ACL'
+                self.logger.summary = 'FAIL: Undeletable VPN ACL'
                 self.logger.details = {'vpnip': self.client_ip,
-                                       'user': self.username}
+                                       'error': 'true',
+                                       'username': self.username,
+                                       'success': 'false'}
                 self.logger.set_severity_from_string('ERROR')
                 self.logger.send()
                 return False
