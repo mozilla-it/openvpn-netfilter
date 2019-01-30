@@ -6,7 +6,7 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-# Copyright (c) 2018 Mozilla Corporation
+# Copyright (c) 2019 Mozilla Corporation
 # Author: gcox@mozilla.com
 # derived from original Author: gdestuynder@mozilla.com
 
@@ -14,7 +14,7 @@ import os
 import subprocess
 from setuptools import setup
 
-VERSION = '1.1.1'
+VERSION = '1.1.2'
 
 
 def git_version():

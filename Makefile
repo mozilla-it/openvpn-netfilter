@@ -2,7 +2,7 @@ INSTALL	:= install
 DESTDIR	:= /
 PREFIX	:= /usr
 PACKAGE := openvpn-netfilter
-VERSION := 1.0.2
+VERSION := 1.0.3
 TEST_FLAGS_FOR_SUITE := -m unittest discover -f -s test
 
 .DEFAULT: test
