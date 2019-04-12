@@ -175,15 +175,16 @@ class TestNetfilterOpenVPN(unittest.TestCase):
             # IMPROVEME:  This test rests on the output having been sorted
             # large-to-small, so this could be exhaustively searched.
             for _prev_acl in _seen_nets:
-                if acl.address in _prev_acl:
+                if acl.address in _prev_acl:  # pragma: no cover
+                    # This should only happen if we're not sorted.
                     self.fail(('{ad} appears in the user '
                                'acls but should have been '
                                'caught by {pa}').format(ad=acl.address,
                                                         pa=_prev_acl))
-                else:
-                    if not acl.portstring:
-                        _seen_nets.append(acl.address)
-        # Falling through the bottom here means we didn't fail.
+            else:
+                # This is domeone we haven't seen before
+                if not acl.portstring:
+                    _seen_nets.append(acl.address)
 
     def test_30_iptables(self):
         """
