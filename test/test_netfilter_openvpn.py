@@ -13,6 +13,7 @@
 import unittest
 import os
 import sys
+import six
 from netaddr import IPNetwork
 sys.path.insert(1, 'iamvpnlibrary')
 sys.path.insert(1, 'mozdef_client')
@@ -56,8 +57,8 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertIsNone(self.library._lock,
                           'NetfilterOpenVPN._lock was not None at init')
         self.library.set_targets(user=_test_user, client_ip=_client_ip)
-        self.assertIsInstance(self.library.username, basestring)
-        self.assertIsInstance(self.library.client_ip, basestring)
+        self.assertIsInstance(self.library.username, six.string_types)
+        self.assertIsInstance(self.library.client_ip, six.string_types)
         self.reset_box()
 
     def tearDown(self):
@@ -84,13 +85,13 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertIsNotNone(self.library.configfile,
                              'NetfilterOpenVPN did not get a config file')
         self.assertIsInstance(self.library.iptables_executable,
-                              basestring,
+                              six.string_types,
                               'NetfilterOpenVPN did not get an iptables file')
         self.assertIsInstance(self.library.ipset_executable,
-                              basestring,
+                              six.string_types,
                               'NetfilterOpenVPN did not get an ipset file')
         self.assertIsInstance(self.library.lockpath,
-                              basestring,
+                              six.string_types,
                               'NetfilterOpenVPN did not get a lockpath file')
         self.assertIsInstance(self.library.lockwaittime,
                               int,
@@ -104,7 +105,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
             Verify the sanity of a chain_name string.
         """
         chain = self.library._chain_name()
-        self.assertIsInstance(chain, basestring,
+        self.assertIsInstance(chain, six.string_types,
                               '_chain_name must be a string')
         self.assertRegexpMatches(chain, self.library.client_ip,
                                  '_chain_name must include a client IP')
@@ -153,13 +154,13 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertIsInstance(acl1, iamvpnlibrary.iamvpnbase.ParsedACL,
                               ('get_acls_for_user did not contain '
                                'ParsedACLs'))
-        self.assertIsInstance(acl1.rule, basestring,
+        self.assertIsInstance(acl1.rule, six.string_types,
                               'ParsedACL.rule was not a string')
         self.assertIsInstance(acl1.address, IPNetwork,
                               'ParsedACL.address was not an IPNetwork')
-        self.assertIsInstance(acl1.portstring, basestring,
+        self.assertIsInstance(acl1.portstring, six.string_types,
                               'ParsedACL.portstring was not a string')
-        self.assertIsInstance(acl1.description, basestring,
+        self.assertIsInstance(acl1.description, six.string_types,
                               'ParsedACL.description was not a string')
         # The ACLs should be sorted large-to-small:
         self.assertGreaterEqual(acl1.address.size,
