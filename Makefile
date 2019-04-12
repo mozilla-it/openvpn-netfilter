@@ -6,7 +6,7 @@ VERSION := 1.0.3
 TEST_FLAGS_FOR_SUITE := -m unittest discover -f -s test
 
 .DEFAULT: test
-.PHONY: all test coverage pythonrpm servicerpm rpm pep8 pylint pypi install clean
+.PHONY: all test coverage coveragereport pythonrpm servicerpm rpm pep8 pylint pypi install clean
 
 all: rpm
 
@@ -15,6 +15,9 @@ test:
 
 coverage:
 	coverage run $(TEST_FLAGS_FOR_SUITE)
+
+coveragereport:
+	coverage report -m netfilter_openvpn.py test/*.py
 
 pythonrpm:
 	fpm -s python -t rpm --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
@@ -35,10 +38,10 @@ servicerpm:
 rpm: pythonrpm servicerpm
 
 pep8:
-	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -type f -name '*.py' -exec pep8 {} \;
+	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -type f -name '*.py' -exec pep8 --show-source --max-line-length=100 {} \;
 
 pylint:
-	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -type f -name '*.py' -exec pylint -r no --disable=locally-disabled {} \;
+	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -type f -name '*.py' -exec pylint -r no --disable=locally-disabled --rcfile=/dev/null {} \;
 
 pypi:
 	python setup.py sdist check upload --sign
@@ -57,7 +60,7 @@ install:
 	$(INSTALL) -m644 systemd-only-kill-process.conf $(DESTDIR)/etc/systemd/system/openvpn@.service.d/only-kill-process.conf
 
 clean:
-	rm -f $(PACKAGE)/*.pyc test/*.pyc
+	rm -f netfilter_openvpn.pyc test/*.pyc
 	rm -rf __pycache__
 	rm -rf dist sdist build
 	rm -rf openvpn_netfilter.egg-info
