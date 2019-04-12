@@ -60,7 +60,7 @@ def main():
     userip = sys.argv[1]
 
     nf_object = netfilter_openvpn.NetfilterOpenVPN()
-    nf_object.set_targets(user=None, client_ip=userip)
+    nf_object.set_targets(client_ip=userip)
 
     if not nf_object.acquire_lock():
         # never obtained a lock, get out

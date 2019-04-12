@@ -53,10 +53,16 @@ def main():
     else:
         usercn = None
 
+    # Pass in the username that they typed.  We won't trust it without
+    # more checks, but let's pass it in anyway.
+    unsafe_username = os.environ.get('username', '')
+
     # Create the object.  Note that there's a "must be root"
     # enforcer in the object initializer.
     nf_object = netfilter_openvpn.NetfilterOpenVPN()
-    nf_object.set_targets(user=usercn, client_ip=client_private_ip)
+    nf_object.set_targets(username_is=usercn,
+                          username_as=unsafe_username,
+                          client_ip=client_private_ip)
 
     # This script is forked off from the openvpn process, and as such,
     # multiple copies of this script may be in flight at any one time.

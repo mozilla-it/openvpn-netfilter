@@ -49,10 +49,16 @@ def main():
     else:
         usercn = None
 
+    # Pass in the username that they typed.  We won't trust it without
+    # more checks, but let's pass it in anyway.
+    unsafe_username = os.environ.get('username', '')
+
     # Create the object.  Note that there's a "must be root"
     # enforcer in the object initializer.
     nf_object = netfilter_openvpn.NetfilterOpenVPN()
-    nf_object.set_targets(user=usercn, client_ip=client_private_ip)
+    nf_object.set_targets(username_is=usercn,
+                          username_as=unsafe_username,
+                          client_ip=client_private_ip)
 
     # This script is forked off from the openvpn process, and as such,
     # multiple copies of this script may be in flight at any one time.
@@ -74,24 +80,25 @@ def main():
         # never obtained a lock, get out
         return False
     _log = nf_object.logger
+    userstring = nf_object.username_string()
 
     if operation == 'add':
         _log.summary = ('SUCCESS: VPN netfilter add upon connection for '
-                        '{}'.format(usercn))
+                        '{}'.format(userstring))
         _log.details = {'sourceipaddress': client_public_ip,
                         'sourceport': client_port,
                         'vpnip': client_private_ip,
-                        'username': usercn,
+                        'username': userstring,
                         'success': 'true'}
         _log.send()
         chain_work_status = nf_object.add_chain()
     elif operation == 'update':
         _log.summary = ('SUCCESS: VPN netfilter add upon reconnection for '
-                        '{}'.format(usercn))
+                        '{}'.format(userstring))
         _log.details = {'sourceipaddress': client_public_ip,
                         'sourceport': client_port,
                         'vpnip': client_private_ip,
-                        'username': usercn,
+                        'username': userstring,
                         'success': 'true'}
         _log.send()
         chain_work_status = nf_object.update_chain()

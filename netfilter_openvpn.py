@@ -52,8 +52,11 @@
 import os
 import sys
 import fcntl
+import ast
+import re
 import signal
 from contextlib import contextmanager
+import six
 import iamvpnlibrary
 import mozdef_client_config
 sys.dont_write_bytecode = True
@@ -134,6 +137,22 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         except (NoOptionError, NoSectionError):  # pragma: no cover
             self.log_to_stdout = True
 
+        try:
+            self.sudo_users = ast.literal_eval(
+                self.configfile.get('openvpn-netfilter-sudo', 'sudo_users'))
+        except:  # pragma: no cover  pylint: disable=bare-except
+            # This bare-except is due to 2.7 limitations in configparser.
+            self.sudo_users = []
+        if not isinstance(self.sudo_users, list):  # pragma: no cover
+            self.sudo_users = []
+
+        try:
+            # Note that we do a 'raw' get here because of regexp's
+            self.sudo_username_regexp = self.configfile.get(
+                'openvpn-netfilter-sudo', 'sudo_username_regexp', True)
+        except (NoOptionError, NoSectionError):  # pragma: no cover
+            self.sudo_username_regexp = None
+
         self._lock = None
         self.username_is = None
         self.username_as = None
@@ -180,7 +199,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             pass
         return config
 
-    def set_targets(self, user=None, client_ip=None):
+    def set_targets(self, username_is=None, username_as=None, client_ip=None):
         """
             Scope this object's target user/client IP.
             We don't do this in __init__ because, in testing, we want to
@@ -188,9 +207,39 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             it could be in init, but, let's make life easy.
         """
         # username_is/username_as can be None in a delete
-        self.username_is = user
-        self.username_as = user
         self.client_ip = client_ip
+        self.username_is = username_is
+        self.username_as = username_is
+        # Yes, '_as' is BY DEFAULT set to '_is', because sudo'ing is a rare case.
+        # We will override this only after going through a gauntlet:
+        if username_is and username_as:
+            # ^ bypass on deletes
+            if (isinstance(self.sudo_username_regexp, six.string_types) and
+                    isinstance(self.sudo_users, list) and username_is in self.sudo_users):
+                # ^ This is deliberately unforgiving, as a safety measure.
+                # At this point we have:
+                # username_is - a cert-defined user, who is in the sudoers list, and
+                # username_as - a string that MAY indicate who the user wants to become.
+                as_match = re.match(self.sudo_username_regexp, username_as)
+                try:
+                    # If the sudoer person typed in a string that regexp matches
+                    # our private pattern, we gather their target user out of the
+                    # regexp match, and assign it into username_as.
+                    self.username_as = as_match.group(1)
+                except (AttributeError):
+                    pass
+
+    def username_string(self):
+        """ Provide a human-readable string describing the user situation """
+        if not self.username_is:
+            return ''
+        elif not self.username_as:
+            return self.username_is
+        elif self.username_is == self.username_as:
+            return self.username_is
+        else:
+            return '{user_is}-sudoing-as-{user_as}'.format(user_is=self.username_is,
+                                                           user_as=self.username_as)
 
     @contextmanager
     def _lock_timeout(self):

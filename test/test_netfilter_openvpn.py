@@ -23,8 +23,11 @@ import netfilter_openvpn  # pylint: disable=wrong-import-position
 sys.dont_write_bytecode = True
 
 
-class TestNetfilterOpenVPN(unittest.TestCase):
-    """ Class of tests """
+class SuccessMixin(object):
+    """
+        These are the tests for when we are going to have successful
+        logins.
+    """
 
     def reset_box(self):
         """
@@ -35,36 +38,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         if self.library.chain_exists():
             self.library.del_chain()
 
-    def setUp(self):
-        """ Preparing test rig """
-        self.assertTrue(os.getuid() == 0,
-                        'Testing requires root due to ipset/iptables use.')
-        self.library = netfilter_openvpn.NetfilterOpenVPN()
-        _cf = self.library.configfile
-        self.assertTrue(_cf.has_section('testing'), (
-            'config file did not have a [testing] section'))
-        # ^ this is necessary for test but not for prod, sorry
-        self.assertTrue(_cf.has_option('testing', 'client_ip'),
-                        'config file did not have a [testing]/client_ip')
-        _client_ip = _cf.get('testing', 'client_ip')
-        self.assertTrue(_cf.has_option('testing', 'client_username'),
-                        'config file did not have a [testing]/client_username')
-        _test_user = _cf.get('testing', 'client_username')
-        self.assertIsNone(self.library.username_is,
-                          'NetfilterOpenVPN.username_is was not None at init')
-        self.assertIsNone(self.library.username_as,
-                          'NetfilterOpenVPN.username_as was not None at init')
-        self.assertIsNone(self.library.client_ip,
-                          'NetfilterOpenVPN.client_ip was not None at init')
-        self.assertIsNone(self.library._lock,
-                          'NetfilterOpenVPN._lock was not None at init')
-        self.library.set_targets(user=_test_user, client_ip=_client_ip)
-        self.assertIsInstance(self.library.username_is, six.string_types)
-        self.assertIsInstance(self.library.username_as, six.string_types)
-        self.assertIsInstance(self.library.client_ip, six.string_types)
-        self.reset_box()
-
-    def tearDown(self):
+    def tearDown(self):  # pylint: disable=invalid-name
         """ Reclaim test rig """
         self.reset_box()
 
@@ -102,6 +76,21 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertIsInstance(self.library.lockretriesmax,
                               int,
                               'NetfilterOpenVPN did not get a lockretriesmax')
+        self.assertIsInstance(self.library.username_is,
+                              six.string_types,
+                              'username_is did not get set')
+        self.assertIsInstance(self.library.username_as,
+                              six.string_types,
+                              'username_as did not get set')
+        self.assertIsInstance(self.library.client_ip,
+                              six.string_types,
+                              'client_ip did not get set')
+        self.assertIsInstance(self.library.sudo_users,
+                              list,
+                              'sudo_users did not get set')
+        self.assertIsInstance(self.library.sudo_username_regexp,
+                              (six.string_types, type(None)),
+                              'sudo_username_regexp did not get set')
 
     def test_10_chain_name(self):
         """
@@ -150,44 +139,51 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertIsInstance(acls, list,
                               'get_acls_for_user must return a list')
         # 5 picked at random for "someone likely has that many acls"
-        self.assertGreater(len(acls), 5,
-                           'get_acls_for_user was a too-short list?')
-        acl1 = acls[0]
-        acl2 = acls[4]
-        self.assertIsInstance(acl1, iamvpnlibrary.iamvpnbase.ParsedACL,
-                              ('get_acls_for_user did not contain '
-                               'ParsedACLs'))
-        self.assertIsInstance(acl1.rule, six.string_types,
-                              'ParsedACL.rule was not a string')
-        self.assertIsInstance(acl1.address, IPNetwork,
-                              'ParsedACL.address was not an IPNetwork')
-        self.assertIsInstance(acl1.portstring, six.string_types,
-                              'ParsedACL.portstring was not a string')
-        self.assertIsInstance(acl1.description, six.string_types,
-                              'ParsedACL.description was not a string')
-        # The ACLs should be sorted large-to-small:
-        self.assertGreaterEqual(acl1.address.size,
-                                acl2.address.size,
-                                'get_acls_for_user list was not size-sorted')
-        # All networks in the ACL should be unique, except possibly
-        # portstring collisions.
-        _seen_nets = []
-        for acl in acls:
-            # for each acl, see if this acl would be enclosed by something
-            # larger elsewhere in this list.
-            # IMPROVEME:  This test rests on the output having been sorted
-            # large-to-small, so this could be exhaustively searched.
-            for _prev_acl in _seen_nets:
-                if acl.address in _prev_acl:  # pragma: no cover
-                    # This should only happen if we're not sorted.
-                    self.fail(('{ad} appears in the user '
-                               'acls but should have been '
-                               'caught by {pa}').format(ad=acl.address,
-                                                        pa=_prev_acl))
-            else:
-                # This is domeone we haven't seen before
-                if not acl.portstring:
-                    _seen_nets.append(acl.address)
+        if self.good_user:
+            self.assertGreater(len(acls), 5,
+                               'get_acls_for_user was a too-short list?')
+            acl1 = acls[0]
+            acl2 = acls[-1]
+            self.assertIsInstance(acl1, iamvpnlibrary.iamvpnbase.ParsedACL,
+                                  ('get_acls_for_user did not contain '
+                                   'ParsedACLs'))
+            self.assertIsInstance(acl1.rule, six.string_types,
+                                  'ParsedACL.rule was not a string')
+            self.assertIsInstance(acl1.address, IPNetwork,
+                                  'ParsedACL.address was not an IPNetwork')
+            self.assertIsInstance(acl1.portstring, six.string_types,
+                                  'ParsedACL.portstring was not a string')
+            self.assertIsInstance(acl1.description, six.string_types,
+                                  'ParsedACL.description was not a string')
+            # The ACLs should be sorted large-to-small:
+            self.assertGreaterEqual(acl1.address.size,
+                                    acl2.address.size,
+                                    'get_acls_for_user list was not size-sorted')
+            # All networks in the ACL should be unique, except possibly
+            # portstring collisions.
+            _seen_nets = []
+            for acl in acls:
+                # for each acl, see if this acl would be enclosed by something
+                # larger elsewhere in this list.
+                # IMPROVEME:  This test rests on the output having been sorted
+                # large-to-small, so this could be exhaustively searched.
+                for _prev_acl in _seen_nets:
+                    if acl.address in _prev_acl:  # pragma: no cover
+                        # This should only happen if we're not sorted.
+                        self.fail(('{ad} appears in the user '
+                                   'acls but should have been '
+                                   'caught by {pa}').format(ad=acl.address,
+                                                            pa=_prev_acl))
+                        # this break will never be reached, but it avoids
+                        # a pylint complaint
+                        break
+                else:
+                    # This is domeone we haven't seen before
+                    if not acl.portstring:
+                        _seen_nets.append(acl.address)
+        else:
+            self.assertEqual(acls, [],
+                             'get_acls_for_user must return empty list for a bad user')
 
     def test_30_iptables(self):
         """
@@ -314,8 +310,9 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         _matchset_rules = [rule for rule in _user_rules if 'match-set' in rule]
         self.assertEqual(len(_matchset_rules), 1,
                          'Deployed rules for user needs one match-set rule')
-        self.assertRegexpMatches(_matchset_rules[0], ';',
-                                 'No semicolons found in match-set comment')
+        if self.good_user:
+            self.assertRegexpMatches(_matchset_rules[0], ';',
+                                     'No semicolons found in match-set comment')
 
     def test_80_safety_blocks(self):
         """
@@ -391,3 +388,198 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertFalse(self.library.chain_exists())
         self.library.del_chain()
         self.assertFalse(self.library.chain_exists())
+
+
+class Test0BasicInit(unittest.TestCase):
+    """ Just testing what an object looks like at the beginning """
+
+    def setUp(self):
+        """ Preparing test rig """
+        self.library = netfilter_openvpn.NetfilterOpenVPN()
+
+    def test_init(self):
+        """ Just the basics. """
+        self.assertTrue(os.getuid() == 0,
+                        'Testing requires root due to ipset/iptables use.')
+        self.assertIsNone(self.library.username_is,
+                          'NetfilterOpenVPN.username_is was not None at init')
+        self.assertIsNone(self.library.username_as,
+                          'NetfilterOpenVPN.username_as was not None at init')
+        self.assertIsNone(self.library.client_ip,
+                          'NetfilterOpenVPN.client_ip was not None at init')
+        self.assertIsNone(self.library._lock,
+                          'NetfilterOpenVPN._lock was not None at init')
+        self.assertEqual(self.library.username_string(), '',
+                         'username_string() should be empty at init')
+
+
+class Test1BadUsers(SuccessMixin, unittest.TestCase):
+    """
+        This checks that, when we have garbage sent in, the right things
+        show up.
+
+        In this test, username_is is garbage/nonhuman and gets no real rules.
+    """
+
+    def setUp(self):
+        """ Preparing test rig """
+        self.library = netfilter_openvpn.NetfilterOpenVPN()
+        self.good_user = False
+        _cf = self.library.configfile
+        self.assertTrue(_cf.has_section('testing'), (
+            'config file did not have a [testing] section'))
+        self.assertTrue(_cf.has_option('testing', 'client_ip'),
+                        'config file did not have a [testing]/client_ip')
+        _client_ip = _cf.get('testing', 'client_ip')
+        self.library.set_targets(username_is='does-not-matter1a@nowhere.org',
+                                 username_as='does-not-matter1b@nowhere.org',
+                                 client_ip=_client_ip)
+        self.reset_box()
+
+    def test_0_set_targets(self):
+        """ Verify users are set correctly """
+        self.assertEqual(self.library.username_is, 'does-not-matter1a@nowhere.org',
+                         'username_is must be set to the user passed in')
+        self.assertEqual(self.library.username_as, 'does-not-matter1a@nowhere.org',
+                         'username_as must be set to the username_is when not-sudoing')
+        self.assertEqual(self.library.username_string(), 'does-not-matter1a@nowhere.org',
+                         'username_string() must be username_is when not-sudoing')
+
+
+class Test2HackAttempt(SuccessMixin, unittest.TestCase):
+    """
+        This checks that, when we have garbage sent in, we don't get anywhere
+        close to promoting a user along the way.
+
+        In this test, username_is is someone trying to hack weakly, by knowing
+        the magic phrase but not being in the sudoers list.
+    """
+
+    def setUp(self):
+        """ Preparing test rig """
+        self.library = netfilter_openvpn.NetfilterOpenVPN()
+        self.good_user = False
+        _cf = self.library.configfile
+        self.assertTrue(_cf.has_section('testing'), (
+            'config file did not have a [testing] section'))
+        self.assertTrue(_cf.has_option('testing', 'client_ip'),
+                        'config file did not have a [testing]/client_ip')
+        _client_ip = _cf.get('testing', 'client_ip')
+        self.library.sudo_users = ['not-you']
+        self.library.sudo_username_regexp = r'^su-to-(\S+)$'
+        self.library.set_targets(username_is='does-not-matter2a@nowhere.org',
+                                 username_as='su-to-someone@nowhere.com',
+                                 client_ip=_client_ip)
+        self.reset_box()
+
+    def test_0_set_targets(self):
+        """ Verify users are set correctly """
+        self.assertEqual(self.library.username_is, 'does-not-matter2a@nowhere.org',
+                         'username_is must be set to the user passed in')
+        self.assertEqual(self.library.username_as, 'does-not-matter2a@nowhere.org',
+                         'username_as must be set to the username_is when not-sudoing')
+        self.assertEqual(self.library.username_string(), 'does-not-matter2a@nowhere.org',
+                         'username_string() must be username_is when not-sudoing')
+
+
+class Test3NormalLogins(SuccessMixin, unittest.TestCase):
+    """
+        This is a plain login, where someone with no special powers logs in
+    """
+
+    def setUp(self):
+        """ Preparing test rig """
+        self.library = netfilter_openvpn.NetfilterOpenVPN()
+        self.good_user = True
+        _cf = self.library.configfile
+        self.assertTrue(_cf.has_section('testing'), (
+            'config file did not have a [testing] section'))
+        self.assertTrue(_cf.has_option('testing', 'client_ip'),
+                        'config file did not have a [testing]/client_ip')
+        _client_ip = _cf.get('testing', 'client_ip')
+        self.assertTrue(_cf.has_option('testing', 'client_username'),
+                        'config file did not have a [testing]/client_username')
+        self.test_user = _cf.get('testing', 'client_username')
+        self.library.set_targets(username_is=self.test_user,
+                                 username_as='any-string-here',
+                                 client_ip=_client_ip)
+        self.reset_box()
+
+    def test_0_set_targets(self):
+        """ Verify users are set correctly """
+        self.assertEqual(self.library.username_is, self.test_user,
+                         'username_is must be set to the user passed in')
+        self.assertEqual(self.library.username_as, self.test_user,
+                         'username_as must be set to the user passed in')
+        self.assertEqual(self.library.username_string(), self.test_user,
+                         'username_string() must be username_is when not-sudoing')
+
+
+class Test4SudoLogins(SuccessMixin, unittest.TestCase):
+    """
+        This test sets up a valid sudoing.
+    """
+
+    def setUp(self):
+        """ Preparing test rig """
+        self.library = netfilter_openvpn.NetfilterOpenVPN()
+        self.good_user = True
+        _cf = self.library.configfile
+        self.assertTrue(_cf.has_section('testing'), (
+            'config file did not have a [testing] section'))
+        self.assertTrue(_cf.has_option('testing', 'client_ip'),
+                        'config file did not have a [testing]/client_ip')
+        _client_ip = _cf.get('testing', 'client_ip')
+        self.assertTrue(_cf.has_option('testing', 'client_username'),
+                        'config file did not have a [testing]/client_username')
+        self.test_user = _cf.get('testing', 'client_username')
+        self.library.sudo_users = ['someone-allowed@yourplace.org']
+        self.library.sudo_username_regexp = r'^su-to-(\S+)$'
+        self.library.set_targets(username_is='someone-allowed@yourplace.org',
+                                 username_as='su-to-{}'.format(self.test_user),
+                                 client_ip=_client_ip)
+        self.reset_box()
+
+    def test_0_set_targets(self):
+        """ Verify users are set correctly """
+        self.assertEqual(self.library.username_is, 'someone-allowed@yourplace.org',
+                         'username_is must be set to the user passed in')
+        self.assertEqual(self.library.username_as, self.test_user,
+                         'username_as must be the sudo user in a valid sudo attempt')
+        self.assertRegexpMatches(self.library.username_string(), r'sudo',
+                                 'username_string() must mention the sudo, when sudoing')
+
+
+class TestMisconfigedSudo(SuccessMixin, unittest.TestCase):
+    """
+        This test sets up a failed sudoing, where we have a mistake in the config file.
+    """
+
+    def setUp(self):
+        """ Preparing test rig """
+        self.library = netfilter_openvpn.NetfilterOpenVPN()
+        self.good_user = True
+        _cf = self.library.configfile
+        self.assertTrue(_cf.has_section('testing'), (
+            'config file did not have a [testing] section'))
+        self.assertTrue(_cf.has_option('testing', 'client_ip'),
+                        'config file did not have a [testing]/client_ip')
+        _client_ip = _cf.get('testing', 'client_ip')
+        self.assertTrue(_cf.has_option('testing', 'client_username'),
+                        'config file did not have a [testing]/client_username')
+        self.test_user = _cf.get('testing', 'client_username')
+        self.library.sudo_users = ['someone-allowed@yourplace.org']
+        self.library.sudo_username_regexp = r'^su-to-someone$'
+        self.library.set_targets(username_is=self.test_user,
+                                 username_as='su-to-aperson@yourplace.org',
+                                 client_ip=_client_ip)
+        self.reset_box()
+
+    def test_0_set_targets(self):
+        """ Verify users are set correctly """
+        self.assertEqual(self.library.username_is, self.test_user,
+                         'username_is must be set to the user passed in')
+        self.assertEqual(self.library.username_as, self.test_user,
+                         'username_as must be the username_is on a misconfiguration')
+        self.assertEqual(self.library.username_string(), self.test_user,
+                         'username_string() must be username_is when sudo is misconfigured')

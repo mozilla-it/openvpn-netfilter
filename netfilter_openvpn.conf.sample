@@ -17,6 +17,23 @@
 # Number of times to try to lock the file
 ; LOCKRETRIESMAX = 10
 
+
+[openvpn-netfilter-sudo]
+# sudo_users is a list of users whose cert CN may become another user.
+# You probably want to leave this empty, as a general rule, and only add
+# people to it when needed for incident testing.
+# sudo_users = [  ]
+sudo_users = [ 'powerful-person@yourplace.com' ]
+
+# sudo_username_regexp is a string, a regexp, that a sudo-allowed person
+# should type in to become some other user.  The gathering parenteses are
+# used to subselect from the string, and to let us flag what subsection of
+# the string is to be used.  This allows us to discriminate / lightly
+# filter mistakes.  That is, it prevents us from activating 'sudo to yourself'
+# use cases.
+sudo_username_regexp = ^su-to-(\S+)$
+
+
 [testing]
 # The 'testing' section contains information for the unit tests.
 # A production instance can/should empty this.
