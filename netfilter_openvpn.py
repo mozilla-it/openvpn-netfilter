@@ -60,9 +60,11 @@ sys.dont_write_bytecode = True
 try:
     # 2.7's module:
     from ConfigParser import SafeConfigParser as ConfigParser
-except ImportError:
+    from ConfigParser import NoOptionError, NoSectionError
+except ImportError:  # pragma: no cover
     # 3's module:
     from configparser import ConfigParser
+    from configparser import NoOptionError, NoSectionError
 
 
 class IptablesFailure(Exception):
@@ -95,32 +97,41 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             establish our variables based on it.
         """
         self.configfile = self._ingest_config_from_file()
-        _cf = self.configfile
-        self.iptables_executable = '/sbin/iptables'
-        if _cf.has_option('openvpn-netfilter', 'iptables_executable'):
+
+        try:
             self.iptables_executable = self.configfile.get(
                 'openvpn-netfilter', 'iptables_executable')
-        self.ipset_executable = '/usr/sbin/ipset'
-        if _cf.has_option('openvpn-netfilter', 'ipset_executable'):
+        except (NoOptionError, NoSectionError):  # pragma: no cover
+            self.iptables_executable = '/sbin/iptables'
+
+        try:
             self.ipset_executable = self.configfile.get(
                 'openvpn-netfilter', 'ipset_executable')
-        self.lockpath = '/var/run/openvpn_netfilter.lock'
-        if _cf.has_option('openvpn-netfilter', 'LOCKPATH'):
+        except (NoOptionError, NoSectionError):  # pragma: no cover
+            self.ipset_executable = '/usr/sbin/ipset'
+
+        try:
             self.lockpath = self.configfile.get(
                 'openvpn-netfilter', 'LOCKPATH')
-        self.lockwaittime = 2  # this is in seconds
-        if _cf.has_option('openvpn-netfilter', 'LOCKWAITTIME'):
+        except (NoOptionError, NoSectionError):  # pragma: no cover
+            self.lockpath = '/var/run/openvpn_netfilter.lock'
+
+        try:
             self.lockwaittime = self.configfile.getint(
                 'openvpn-netfilter', 'LOCKWAITTIME')
-        self.lockretriesmax = 10
-        if _cf.has_option('openvpn-netfilter', 'LOCKRETRIESMAX'):
+        except (NoOptionError, NoSectionError):  # pragma: no cover
+            self.lockwaittime = 2  # this is in seconds
+
+        try:
             self.lockretriesmax = self.configfile.getint(
                 'openvpn-netfilter', 'LOCKRETRIESMAX')
-        if (_cf.has_section('openvpn-netfilter') and
-                _cf.has_option('openvpn-netfilter', 'log_to_stdout')):
-            self.log_to_stdout = _cf.getboolean('openvpn-netfilter',
-                                                'log_to_stdout')
-        else:
+        except (NoOptionError, NoSectionError):  # pragma: no cover
+            self.lockretriesmax = 10
+
+        try:
+            self.log_to_stdout = self.configfile.getboolean(
+                'openvpn-netfilter', 'log_to_stdout')
+        except (NoOptionError, NoSectionError):  # pragma: no cover
             self.log_to_stdout = True
 
         self._lock = None
@@ -150,7 +161,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         """
         if conf_file is None:
             conf_file = self.__class__.CONFIG_FILE_LOCATIONS
-        if not isinstance(conf_file, list):
+        elif not isinstance(conf_file, list):  # pragma: no cover
             conf_file = [conf_file]
         config = ConfigParser()
         for filename in conf_file:
@@ -158,7 +169,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 try:
                     config.read(filename)
                     break
-                except:  # pylint: disable=bare-except
+                except:  # pragma: no cover  pylint: disable=bare-except
                     # This bare-except is due to 2.7
                     # limitations in configparser.
                     pass
@@ -218,7 +229,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     self._lock = open(self.lockpath, 'a+')
                     # ... and try to lock it.
                     fcntl.flock(self._lock, fcntl.LOCK_EX)
-                except (IOError, OSError) as err:
+                except (IOError, OSError):  # pragma: no cover
                     # We didn't lock this time.  Don't react.
                     # We'll try again.
                     pass
@@ -278,7 +289,8 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             command = command + ' >/dev/null 2>&1'
         # IMPROVEME: replace os.system
         status = os.system(command)
-        if status == -1:
+        if status == -1:  # pragma: no cover
+            # This would require a test case where we misset iptables
             raise IptablesFailure(
                 'failed to invoke iptables ({c})'.format(c=command))
         status = os.WEXITSTATUS(status)
@@ -529,7 +541,9 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 self.iptables(
                     '-D FORWARD -s {ip} -j DROP >/dev/null 2>&1'.format(
                         ip=self.client_ip), True)
-        except IptablesFailure:
+        except IptablesFailure:  # pragma: no cover
+            # This is an almost-impossible exception to throw, as it would be
+            # a 'we saw it but couldn't delete it' situation.
             self.logger.summary = ('FAIL: did not delete blocking rule, '
                                    'potential security issue')
             self.logger.set_severity_from_string('CRITICAL')
@@ -589,8 +603,10 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             self.logger.send()
             self.del_chain()
             # having now wiped the chain, check again:
-            if self.chain_exists():
+            if self.chain_exists():  # pragma: no cover
                 # It didn't delete.  Severe problem.
+                # This is almost impossible to test, as it means we
+                # tried to delete a chain, but it couldn't be deleted.
                 self.logger.summary = 'FAIL: Undeletable VPN ACL'
                 self.logger.details = {'vpnip': self.client_ip,
                                        'error': 'true',
