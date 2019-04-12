@@ -50,14 +50,17 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertTrue(_cf.has_option('testing', 'client_username'),
                         'config file did not have a [testing]/client_username')
         _test_user = _cf.get('testing', 'client_username')
-        self.assertIsNone(self.library.username,
-                          'NetfilterOpenVPN.username was not None at init')
+        self.assertIsNone(self.library.username_is,
+                          'NetfilterOpenVPN.username_is was not None at init')
+        self.assertIsNone(self.library.username_as,
+                          'NetfilterOpenVPN.username_as was not None at init')
         self.assertIsNone(self.library.client_ip,
                           'NetfilterOpenVPN.client_ip was not None at init')
         self.assertIsNone(self.library._lock,
                           'NetfilterOpenVPN._lock was not None at init')
         self.library.set_targets(user=_test_user, client_ip=_client_ip)
-        self.assertIsInstance(self.library.username, six.string_types)
+        self.assertIsInstance(self.library.username_is, six.string_types)
+        self.assertIsInstance(self.library.username_as, six.string_types)
         self.assertIsInstance(self.library.client_ip, six.string_types)
         self.reset_box()
 
@@ -255,7 +258,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
                                   _junk_dest_address +
                                   ' -p tcp -m multiport --dports ' +
                                   _multiports1 + ' -j ACCEPT', False))
-        commentstring = self.library.username + ':blah ACL ssh test'
+        commentstring = self.library.username_is + ':blah ACL ssh test'
         self.assertTrue(
             self.library.iptables('-C ' + chain + ' -s ' +
                                   self.library.client_ip + ' -d ' +
@@ -307,7 +310,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         # IMPROVEME os calls
         _all_rules = os.popen(command).read().splitlines()
         _user_rules = [rule for rule in _all_rules
-                       if self.library.username in rule]
+                       if self.library.username_is in rule]
         _matchset_rules = [rule for rule in _user_rules if 'match-set' in rule]
         self.assertEqual(len(_matchset_rules), 1,
                          'Deployed rules for user needs one match-set rule')

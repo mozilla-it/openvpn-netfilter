@@ -124,7 +124,8 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             self.log_to_stdout = True
 
         self._lock = None
-        self.username = None
+        self.username_is = None
+        self.username_as = None
         self.client_ip = None
         self.logger = mozdef_client_config.ConfigedMozDefEvent()
         # While 'Authorization' might seem more correct (we are layering
@@ -175,8 +176,9 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             get our targets from the config file.  In production,
             it could be in init, but, let's make life easy.
         """
-        # username could be None in a delete
-        self.username = user
+        # username_is/username_as can be None in a delete
+        self.username_is = user
+        self.username_as = user
         self.client_ip = client_ip
 
     @contextmanager
@@ -332,7 +334,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         comment = ''
         if acl.description:
             _commentstring = '{user}:{group} ACL {desc}'.format(
-                user=self.username,
+                user=self.username_is,
                 group=acl.rule,
                 desc=acl.description,
             )
@@ -400,11 +402,11 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                                           protocol, acl)
 
         _commentstring = '{user} groups: {rulestr}'.format(
-            rulestr=unique_rules_string, user=self.username)
+            rulestr=unique_rules_string, user=self.username_is)
         rules_comment = '-m comment --comment "{comment}"'.format(
             comment=_commentstring[:255])
         username_comment = '-m comment --comment "{user} at {ip}"'.format(
-            ip=self.client_ip, user=self.username)
+            ip=self.client_ip, user=self.username_is)
 
         # Insert glue to have the user's ipset high up...
         use_ipset_rule = ('-I {chain} -s {ip} '
@@ -431,7 +433,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         self.iptables(log_drops_rule.format(
             comment=username_comment,
             chain=chain,
-            user=self.username[:23]), True)
+            user=self.username_is[:23]), True)
         drop_rule = ('-A {chain} '
                      '{comment} '
                      '-j DROP')
@@ -441,12 +443,12 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
     def get_acls_for_user(self):
         """
             Fetch the ACLs that a user is allowed to connect to.
-            Input: None (uses self.username)
+            Input: None (uses self.username_as)
             Return: [ParsedACL, ParsedACL, ...]
         """
         iam_object = iamvpnlibrary.IAMVPNLibrary()
         # Get the user's ACLs:
-        raw_acls = iam_object.get_allowed_vpn_acls(self.username)
+        raw_acls = iam_object.get_allowed_vpn_acls(self.username_as)
         # Now, sort those.  We sort low to high based on netmask and network
         # This is a little odd to follow.  It's basically doing a sort that
         # is size largest-to-smallest then, within networks of the same size,
@@ -533,7 +535,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             self.logger.set_severity_from_string('CRITICAL')
             self.logger.details = {'vpnip': self.client_ip,
                                    'error': 'true',
-                                   'username': self.username,
+                                   'username': self.username_is,
                                    'success': 'false'}
             self.logger.send()
 
@@ -581,7 +583,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             self.logger.summary = 'FAIL: Collision of adding a VPN ACL'
             self.logger.details = {'vpnip': self.client_ip,
                                    'error': 'true',
-                                   'username': self.username,
+                                   'username': self.username_is,
                                    'success': 'false'}
             self.logger.set_severity_from_string('WARNING')
             self.logger.send()
@@ -592,7 +594,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 self.logger.summary = 'FAIL: Undeletable VPN ACL'
                 self.logger.details = {'vpnip': self.client_ip,
                                        'error': 'true',
-                                       'username': self.username,
+                                       'username': self.username_is,
                                        'success': 'false'}
                 self.logger.set_severity_from_string('ERROR')
                 self.logger.send()
