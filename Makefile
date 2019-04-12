@@ -2,7 +2,7 @@ INSTALL	:= install
 DESTDIR	:= /
 PREFIX	:= /usr
 PACKAGE := openvpn-netfilter
-VERSION := 1.0.3
+VERSION := 1.0.4
 TEST_FLAGS_FOR_SUITE := -m unittest discover -f -s test
 
 .DEFAULT: test
@@ -29,7 +29,7 @@ pythonrpm:
 servicerpm:
 	$(MAKE) DESTDIR=./tmp install
 	fpm -s dir -t rpm --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
-    -d python-$(PACKAGE) -d openvpn \
+    -d "python-$(PACKAGE) >= 1.1.4" -d openvpn \
     -n $(PACKAGE) -v $(VERSION) \
     --url https://github.com/mozilla-it/openvpn-netfilter \
     -a noarch -C tmp etc usr
