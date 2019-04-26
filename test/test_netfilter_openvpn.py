@@ -85,12 +85,6 @@ class SuccessMixin(object):
         self.assertIsInstance(self.library.client_ip,
                               six.string_types,
                               'client_ip did not get set')
-        self.assertIsInstance(self.library.sudo_users,
-                              list,
-                              'sudo_users did not get set')
-        self.assertIsInstance(self.library.sudo_username_regexp,
-                              (six.string_types, type(None)),
-                              'sudo_username_regexp did not get set')
 
     def test_10_chain_name(self):
         """
@@ -413,75 +407,6 @@ class Test0BasicInit(unittest.TestCase):
                          'username_string() should be empty at init')
 
 
-class Test1BadUsers(SuccessMixin, unittest.TestCase):
-    """
-        This checks that, when we have garbage sent in, the right things
-        show up.
-
-        In this test, username_is is garbage/nonhuman and gets no real rules.
-    """
-
-    def setUp(self):
-        """ Preparing test rig """
-        self.library = netfilter_openvpn.NetfilterOpenVPN()
-        self.good_user = False
-        _cf = self.library.configfile
-        self.assertTrue(_cf.has_section('testing'), (
-            'config file did not have a [testing] section'))
-        self.assertTrue(_cf.has_option('testing', 'client_ip'),
-                        'config file did not have a [testing]/client_ip')
-        _client_ip = _cf.get('testing', 'client_ip')
-        self.library.set_targets(username_is='does-not-matter1a@nowhere.org',
-                                 username_as='does-not-matter1b@nowhere.org',
-                                 client_ip=_client_ip)
-        self.reset_box()
-
-    def test_0_set_targets(self):
-        """ Verify users are set correctly """
-        self.assertEqual(self.library.username_is, 'does-not-matter1a@nowhere.org',
-                         'username_is must be set to the user passed in')
-        self.assertEqual(self.library.username_as, 'does-not-matter1a@nowhere.org',
-                         'username_as must be set to the username_is when not-sudoing')
-        self.assertEqual(self.library.username_string(), 'does-not-matter1a@nowhere.org',
-                         'username_string() must be username_is when not-sudoing')
-
-
-class Test2HackAttempt(SuccessMixin, unittest.TestCase):
-    """
-        This checks that, when we have garbage sent in, we don't get anywhere
-        close to promoting a user along the way.
-
-        In this test, username_is is someone trying to hack weakly, by knowing
-        the magic phrase but not being in the sudoers list.
-    """
-
-    def setUp(self):
-        """ Preparing test rig """
-        self.library = netfilter_openvpn.NetfilterOpenVPN()
-        self.good_user = False
-        _cf = self.library.configfile
-        self.assertTrue(_cf.has_section('testing'), (
-            'config file did not have a [testing] section'))
-        self.assertTrue(_cf.has_option('testing', 'client_ip'),
-                        'config file did not have a [testing]/client_ip')
-        _client_ip = _cf.get('testing', 'client_ip')
-        self.library.sudo_users = ['not-you']
-        self.library.sudo_username_regexp = r'^su-to-(\S+)$'
-        self.library.set_targets(username_is='does-not-matter2a@nowhere.org',
-                                 username_as='su-to-someone@nowhere.com',
-                                 client_ip=_client_ip)
-        self.reset_box()
-
-    def test_0_set_targets(self):
-        """ Verify users are set correctly """
-        self.assertEqual(self.library.username_is, 'does-not-matter2a@nowhere.org',
-                         'username_is must be set to the user passed in')
-        self.assertEqual(self.library.username_as, 'does-not-matter2a@nowhere.org',
-                         'username_as must be set to the username_is when not-sudoing')
-        self.assertEqual(self.library.username_string(), 'does-not-matter2a@nowhere.org',
-                         'username_string() must be username_is when not-sudoing')
-
-
 class Test3NormalLogins(SuccessMixin, unittest.TestCase):
     """
         This is a plain login, where someone with no special powers logs in
@@ -513,73 +438,3 @@ class Test3NormalLogins(SuccessMixin, unittest.TestCase):
                          'username_as must be set to the user passed in')
         self.assertEqual(self.library.username_string(), self.test_user,
                          'username_string() must be username_is when not-sudoing')
-
-
-class Test4SudoLogins(SuccessMixin, unittest.TestCase):
-    """
-        This test sets up a valid sudoing.
-    """
-
-    def setUp(self):
-        """ Preparing test rig """
-        self.library = netfilter_openvpn.NetfilterOpenVPN()
-        self.good_user = True
-        _cf = self.library.configfile
-        self.assertTrue(_cf.has_section('testing'), (
-            'config file did not have a [testing] section'))
-        self.assertTrue(_cf.has_option('testing', 'client_ip'),
-                        'config file did not have a [testing]/client_ip')
-        _client_ip = _cf.get('testing', 'client_ip')
-        self.assertTrue(_cf.has_option('testing', 'client_username'),
-                        'config file did not have a [testing]/client_username')
-        self.test_user = _cf.get('testing', 'client_username')
-        self.library.sudo_users = ['someone-allowed@yourplace.org']
-        self.library.sudo_username_regexp = r'^su-to-(\S+)$'
-        self.library.set_targets(username_is='someone-allowed@yourplace.org',
-                                 username_as='su-to-{}'.format(self.test_user),
-                                 client_ip=_client_ip)
-        self.reset_box()
-
-    def test_0_set_targets(self):
-        """ Verify users are set correctly """
-        self.assertEqual(self.library.username_is, 'someone-allowed@yourplace.org',
-                         'username_is must be set to the user passed in')
-        self.assertEqual(self.library.username_as, self.test_user,
-                         'username_as must be the sudo user in a valid sudo attempt')
-        self.assertRegexpMatches(self.library.username_string(), r'sudo',
-                                 'username_string() must mention the sudo, when sudoing')
-
-
-class TestMisconfigedSudo(SuccessMixin, unittest.TestCase):
-    """
-        This test sets up a failed sudoing, where we have a mistake in the config file.
-    """
-
-    def setUp(self):
-        """ Preparing test rig """
-        self.library = netfilter_openvpn.NetfilterOpenVPN()
-        self.good_user = True
-        _cf = self.library.configfile
-        self.assertTrue(_cf.has_section('testing'), (
-            'config file did not have a [testing] section'))
-        self.assertTrue(_cf.has_option('testing', 'client_ip'),
-                        'config file did not have a [testing]/client_ip')
-        _client_ip = _cf.get('testing', 'client_ip')
-        self.assertTrue(_cf.has_option('testing', 'client_username'),
-                        'config file did not have a [testing]/client_username')
-        self.test_user = _cf.get('testing', 'client_username')
-        self.library.sudo_users = ['someone-allowed@yourplace.org']
-        self.library.sudo_username_regexp = r'^su-to-someone$'
-        self.library.set_targets(username_is=self.test_user,
-                                 username_as='su-to-aperson@yourplace.org',
-                                 client_ip=_client_ip)
-        self.reset_box()
-
-    def test_0_set_targets(self):
-        """ Verify users are set correctly """
-        self.assertEqual(self.library.username_is, self.test_user,
-                         'username_is must be set to the user passed in')
-        self.assertEqual(self.library.username_as, self.test_user,
-                         'username_as must be the username_is on a misconfiguration')
-        self.assertEqual(self.library.username_string(), self.test_user,
-                         'username_string() must be username_is when sudo is misconfigured')

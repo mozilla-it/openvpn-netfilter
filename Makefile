@@ -22,7 +22,7 @@ coveragereport:
 pythonrpm:
 	fpm -s python -t rpm --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
     -d iptables -d ipset \
-    --iteration 1 setup.py
+    --iteration 2 setup.py
 	@rm -rf openvpn_netfilter.egg-info
 
 # FIXME: summary  description   git?
@@ -32,6 +32,7 @@ servicerpm:
     -d "python-$(PACKAGE) >= 1.1.4" -d openvpn \
     -n $(PACKAGE) -v $(VERSION) \
     --url https://github.com/mozilla-it/openvpn-netfilter \
+    --iteration 2 \
     -a noarch -C tmp etc usr
 	rm -rf ./tmp
 

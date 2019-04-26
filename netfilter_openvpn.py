@@ -137,26 +137,11 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         except (NoOptionError, NoSectionError):  # pragma: no cover
             self.log_to_stdout = True
 
-        try:
-            self.sudo_users = ast.literal_eval(
-                self.configfile.get('openvpn-netfilter-sudo', 'sudo_users'))
-        except:  # pragma: no cover  pylint: disable=bare-except
-            # This bare-except is due to 2.7 limitations in configparser.
-            self.sudo_users = []
-        if not isinstance(self.sudo_users, list):  # pragma: no cover
-            self.sudo_users = []
-
-        try:
-            # Note that we do a 'raw' get here because of regexp's
-            self.sudo_username_regexp = self.configfile.get(
-                'openvpn-netfilter-sudo', 'sudo_username_regexp', True)
-        except (NoOptionError, NoSectionError):  # pragma: no cover
-            self.sudo_username_regexp = None
-
         self._lock = None
         self.username_is = None
         self.username_as = None
         self.client_ip = None
+        self.iam_object = None
         self.logger = mozdef_client_config.ConfigedMozDefEvent()
         # While 'Authorization' might seem more correct (we are layering
         # access upon a user after they have been authenticated), we are
@@ -165,7 +150,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         self.logger.category = 'Authentication'
         self.logger.source = 'openvpn'
         self.logger.tags = ['vpn', 'netfilter']
-        if os.geteuid() != 0:
+        if os.geteuid() != 0:  # pragma: no cover
             # Since everything in this class will modify iptables/ipset,
             # this library pretty much must run as root.
             #
@@ -214,20 +199,8 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         # We will override this only after going through a gauntlet:
         if username_is and username_as:
             # ^ bypass on deletes
-            if (isinstance(self.sudo_username_regexp, six.string_types) and
-                    isinstance(self.sudo_users, list) and username_is in self.sudo_users):
-                # ^ This is deliberately unforgiving, as a safety measure.
-                # At this point we have:
-                # username_is - a cert-defined user, who is in the sudoers list, and
-                # username_as - a string that MAY indicate who the user wants to become.
-                as_match = re.match(self.sudo_username_regexp, username_as)
-                try:
-                    # If the sudoer person typed in a string that regexp matches
-                    # our private pattern, we gather their target user out of the
-                    # regexp match, and assign it into username_as.
-                    self.username_as = as_match.group(1)
-                except (AttributeError):
-                    pass
+            self.iam_object = iamvpnlibrary.IAMVPNLibrary()
+            self.username_as = self.iam_object.verify_sudo_user(username_is, username_as)
 
     def username_string(self):
         """ Provide a human-readable string describing the user situation """
@@ -366,7 +339,9 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             command = command + ' >/dev/null 2>&1'
         # IMPROVEME: replace os.system
         status = os.system(command)
-        if status == -1:
+        if status == -1:  # pragma: no cover
+            # This section covers an OS failure, this is almost
+            # impossible to simulate.
             raise IpsetFailure(
                 'failed to invoke ipset ({c})'.format(c=command))
         status = os.WEXITSTATUS(status)
@@ -507,9 +482,8 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             Input: None (uses self.username_as)
             Return: [ParsedACL, ParsedACL, ...]
         """
-        iam_object = iamvpnlibrary.IAMVPNLibrary()
         # Get the user's ACLs:
-        raw_acls = iam_object.get_allowed_vpn_acls(self.username_as)
+        raw_acls = self.iam_object.get_allowed_vpn_acls(self.username_as)
         # Now, sort those.  We sort low to high based on netmask and network
         # This is a little odd to follow.  It's basically doing a sort that
         # is size largest-to-smallest then, within networks of the same size,

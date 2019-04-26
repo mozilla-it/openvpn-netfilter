@@ -60,7 +60,7 @@ setup(
     keywords="mozdef client library",
     url="https://github.com/mozilla-it/openvpn-netfilter",
     long_description=read('README.rst'),
-    install_requires=['iamvpnlibrary', 'mozdef-client-config'],
+    install_requires=['iamvpnlibrary>=0.9.0', 'mozdef-client-config'],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Topic :: System :: Logging",
