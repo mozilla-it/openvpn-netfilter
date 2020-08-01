@@ -143,11 +143,11 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         self.client_ip = None
         self.iam_object = None
         self.logger = mozdef_client_config.ConfigedMozDefEvent()
-        # While 'Authorization' might seem more correct (we are layering
+        # While 'authorization' might seem more correct (we are layering
         # access upon a user after they have been authenticated), we are
         # asked to put all login-related info under the category of
-        # 'Authentication'.  So, don't change this without an EIS consult.
-        self.logger.category = 'Authentication'
+        # 'authentication'.  So, don't change this without an EIS consult.
+        self.logger.category = 'authentication'
         self.logger.source = 'openvpn'
         self.logger.tags = ['vpn', 'netfilter']
         if os.geteuid() != 0:  # pragma: no cover
