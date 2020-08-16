@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -12,15 +11,11 @@
 
 import unittest
 import os
-import sys
+import test.context  # pylint: disable=unused-import
 import six
 from netaddr import IPNetwork
-sys.path.insert(1, 'iamvpnlibrary')
-sys.path.insert(1, 'mozdef_client')
-sys.path.insert(1, 'mozdef_client_config')
 import iamvpnlibrary  # pylint: disable=wrong-import-position
 import netfilter_openvpn  # pylint: disable=wrong-import-position
-sys.dont_write_bytecode = True
 
 
 class SuccessMixin(object):
