@@ -44,7 +44,7 @@ def main():
     # client_private_ip is the IP that the client will be assigned after
     # all of this is said and done.
 
-    if operation == 'add' or operation == 'update':
+    if operation in ('add', 'update'):
         usercn = sys.argv[3]
     else:
         usercn = None
@@ -120,7 +120,7 @@ def main():
         chain_work_status = False
 
     if nf_object.log_to_stdout:
-        print _log.syslog_convert()
+        print(_log.syslog_convert())
 
     # Print to stdout here because we want a local copy of the results.
     # We could log to syslog, but that separates our files from the

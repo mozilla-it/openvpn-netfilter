@@ -48,7 +48,7 @@ def main():
     # client_private_ip is the IP that the client will be assigned after
     # all of this is said and done.
 
-    if operation == 'add' or operation == 'update':
+    if operation in ('add', 'update'):
         usercn = sys.argv[3]
     else:
         usercn = None
@@ -97,20 +97,20 @@ def main():
     try:
         pid = os.fork()
     except OSError:
-        exit("Could not create a child process")
+        sys.exit("Could not create a child process")
 
     if pid:
         # This is the parent.
         # The parent just needs to bail out.
         return True
-    else:
-        # This is the child.
-        # This should exec away.
-        # IMPROVEME - hardcoded script.
-        os.execve('/usr/lib/openvpn/plugins/netfilter_openvpn_async.py',
-                  sys.argv, os.environ)
-        # We should never get here:
-        return False
+
+    # This is the child.
+    # This should exec away.
+    # IMPROVEME - hardcoded script.
+    os.execve('/usr/lib/openvpn/plugins/netfilter_openvpn_async.py',
+              sys.argv, os.environ)
+    # We should never get here:
+    return False
 
 
 if __name__ == "__main__":

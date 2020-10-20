@@ -106,7 +106,6 @@ class SuccessMixin(object):
             Make a lock, try making another lock and failing,
             then release a lock
         """
-        pass
         # This case should be written.
         # The problem stems from the need to make this unittest be
         # multiprocessor.  Making 2 locks from this test will succeed

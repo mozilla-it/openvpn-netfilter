@@ -52,36 +52,27 @@
 import os
 import sys
 import fcntl
-import ast
-import re
 import signal
 from contextlib import contextmanager
-import six
 import iamvpnlibrary
 import mozdef_client_config
 sys.dont_write_bytecode = True
 try:
-    # 2.7's module:
-    from ConfigParser import SafeConfigParser as ConfigParser
-    from ConfigParser import NoOptionError, NoSectionError
+    import configparser
 except ImportError:  # pragma: no cover
-    # 3's module:
-    from configparser import ConfigParser
-    from configparser import NoOptionError, NoSectionError
+    from six.moves import configparser
 
 
 class IptablesFailure(Exception):
     """
         A named Exception to raise upon an iptables failure
     """
-    pass
 
 
 class IpsetFailure(Exception):
     """
         A named Exception to raise upon an ipset failure
     """
-    pass
 
 
 class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
@@ -104,37 +95,37 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         try:
             self.iptables_executable = self.configfile.get(
                 'openvpn-netfilter', 'iptables_executable')
-        except (NoOptionError, NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
             self.iptables_executable = '/sbin/iptables'
 
         try:
             self.ipset_executable = self.configfile.get(
                 'openvpn-netfilter', 'ipset_executable')
-        except (NoOptionError, NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
             self.ipset_executable = '/usr/sbin/ipset'
 
         try:
             self.lockpath = self.configfile.get(
                 'openvpn-netfilter', 'LOCKPATH')
-        except (NoOptionError, NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
             self.lockpath = '/var/run/openvpn_netfilter.lock'
 
         try:
             self.lockwaittime = self.configfile.getint(
                 'openvpn-netfilter', 'LOCKWAITTIME')
-        except (NoOptionError, NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
             self.lockwaittime = 2  # this is in seconds
 
         try:
             self.lockretriesmax = self.configfile.getint(
                 'openvpn-netfilter', 'LOCKRETRIESMAX')
-        except (NoOptionError, NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
             self.lockretriesmax = 10
 
         try:
             self.log_to_stdout = self.configfile.getboolean(
                 'openvpn-netfilter', 'log_to_stdout')
-        except (NoOptionError, NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
             self.log_to_stdout = True
 
         self._lock = None
@@ -167,7 +158,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             conf_file = self.__class__.CONFIG_FILE_LOCATIONS
         elif not isinstance(conf_file, list):  # pragma: no cover
             conf_file = [conf_file]
-        config = ConfigParser()
+        config = configparser.ConfigParser()
         for filename in conf_file:
             if os.path.isfile(filename):
                 try:
@@ -206,20 +197,18 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         """ Provide a human-readable string describing the user situation """
         if not self.username_is:
             return ''
-        elif not self.username_as:
+        if not self.username_as:
             return self.username_is
-        elif self.username_is == self.username_as:
+        if self.username_is == self.username_as:
             return self.username_is
-        else:
-            return '{user_is}-sudoing-as-{user_as}'.format(user_is=self.username_is,
-                                                           user_as=self.username_as)
+        return '{user_is}-sudoing-as-{user_as}'.format(user_is=self.username_is,
+                                                       user_as=self.username_as)
 
     @contextmanager
     def _lock_timeout(self):
         """ A function to do timeouts """
         def __timeout_handler(_signum, _frame):
             """ A noop function """
-            pass
 
         # Save off the original signal handler for alarm, add in a dummy
         # noop function.
@@ -322,8 +311,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     status=status, c=command))
         if status != 0:
             return False
-        else:
-            return True
+        return True
 
     def ipset(self, argstr, raiseexception=True):
         """
@@ -351,8 +339,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     status=status, c=command))
         if status != 0:
             return False
-        else:
-            return True
+        return True
 
     def _build_firewall_rule(self, name, usersrcip, protocol, acl):
         """
@@ -416,8 +403,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             Output: None.
             Changes: box will have an iptables+ipset for the user's IP.
         """
-        unique_rules_string = ';'.join(sorted(
-            set([x.rule for x in user_acls])))
+        unique_rules_string = ';'.join(sorted({x.rule for x in user_acls}))
         # The semicolon-delimited list of rules is used by the
         # vpn-fw-find-user utility script.
         chain = self._chain_name()
@@ -638,9 +624,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 self.logger.set_severity_from_string('ERROR')
                 self.logger.send()
                 return False
-            else:
-                # We cleaned the chain out, proceed with a new add.
-                pass
+            # We cleaned the chain out, proceed with a new add.
         user_acls = self.get_acls_for_user()
         self.create_user_rules(user_acls)
         # At this point, an iptable and ipset for usersrcip are now in place.
@@ -670,6 +654,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         self.iptables('-F {chain}'.format(chain=chain), False)
         self.iptables('-X {chain}'.format(chain=chain), False)
         self.ipset('--destroy {chain}'.format(chain=chain), False)
+        return True
 
     def update_chain(self):
         """
