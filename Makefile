@@ -11,10 +11,12 @@ PLAIN_PYTHON = $(shell which python 2>/dev/null)
 PYTHON3 = $(shell which python3 2>/dev/null)
 ifneq (, $(PYTHON3))
   PYTHON_BIN = $(PYTHON3)
+  PY_PACKAGE_PREFIX = python3
   RPM_MAKE_TARGET = pythonrpm3
 endif
 ifneq (, $(PLAIN_PYTHON))
   PYTHON_BIN = $(PLAIN_PYTHON)
+  PY_PACKAGE_PREFIX = python
   RPM_MAKE_TARGET = pythonrpm2
 endif
 
@@ -39,13 +41,13 @@ coveragereport:
 pythonrpm:  $(RPM_MAKE_TARGET)
 
 pythonrpm2:
-	fpm -s python -t rpm --python-bin $(PYTHON_BIN) --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
+	fpm -s python -t rpm --python-bin $(PYTHON_BIN) --python-package-name-prefix $(PY_PACKAGE_PREFIX) --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
     -d iptables -d ipset \
     --iteration 1 setup.py
 	@rm -rf openvpn_netfilter.egg-info
 
 pythonrpm3:
-	fpm -s python -t rpm --python-bin $(PYTHON_BIN) --python-package-name-prefix python --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
+	fpm -s python -t rpm --python-bin $(PYTHON_BIN) --python-package-name-prefix $(PY_PACKAGE_PREFIX) --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
     -d iptables -d ipset \
     --iteration 1 setup.py
 	@rm -rf openvpn_netfilter.egg-info
@@ -54,7 +56,7 @@ pythonrpm3:
 servicerpm:
 	$(MAKE) DESTDIR=./tmp install
 	fpm -s dir -t rpm --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
-    -d "python-$(PACKAGE) >= 1.1.4" -d openvpn \
+    -d "$(PY_PACKAGE_PREFIX)-$(PACKAGE) >= 1.1.4" -d openvpn \
     -n $(PACKAGE) -v $(VERSION) \
     --url https://github.com/mozilla-it/openvpn-netfilter \
     --iteration 1 \
