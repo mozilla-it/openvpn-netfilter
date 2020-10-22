@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
     Setup script for the library.
     This packages the library file that integration scripts will use.
@@ -14,7 +13,7 @@ import os
 import subprocess
 from setuptools import setup
 
-VERSION = '1.1.4'
+VERSION = '1.1.5'
 
 
 def git_version():

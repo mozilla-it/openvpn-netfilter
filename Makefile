@@ -2,7 +2,7 @@ INSTALL	:= install
 DESTDIR	:= /
 PREFIX	:= /usr
 PACKAGE := openvpn-netfilter
-VERSION := 1.0.4
+VERSION := 1.1.5
 .DEFAULT: coverage
 .PHONY: coverage coveragereport pep8 pylint pythonrpm rpm pythonrpm2 pythonrpm3 servicerpm pypi install clean
 TEST_FLAGS_FOR_SUITE := -m unittest discover -f
@@ -57,7 +57,7 @@ servicerpm:
     -d "python-$(PACKAGE) >= 1.1.4" -d openvpn \
     -n $(PACKAGE) -v $(VERSION) \
     --url https://github.com/mozilla-it/openvpn-netfilter \
-    --iteration 2 \
+    --iteration 1 \
     -a noarch -C tmp etc usr
 	rm -rf ./tmp
 
