@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
     This is a librarification of the commands that should add/delete
     netfilter rules for someone connecting to OpenVPN.  This applies
@@ -95,37 +94,37 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         try:
             self.iptables_executable = self.configfile.get(
                 'openvpn-netfilter', 'iptables_executable')
-        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):
             self.iptables_executable = '/sbin/iptables'
 
         try:
             self.ipset_executable = self.configfile.get(
                 'openvpn-netfilter', 'ipset_executable')
-        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):
             self.ipset_executable = '/usr/sbin/ipset'
 
         try:
             self.lockpath = self.configfile.get(
                 'openvpn-netfilter', 'LOCKPATH')
-        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):
             self.lockpath = '/var/run/openvpn_netfilter.lock'
 
         try:
             self.lockwaittime = self.configfile.getint(
                 'openvpn-netfilter', 'LOCKWAITTIME')
-        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):
             self.lockwaittime = 2  # this is in seconds
 
         try:
             self.lockretriesmax = self.configfile.getint(
                 'openvpn-netfilter', 'LOCKRETRIESMAX')
-        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):
             self.lockretriesmax = 10
 
         try:
             self.log_to_stdout = self.configfile.getboolean(
                 'openvpn-netfilter', 'log_to_stdout')
-        except (configparser.NoOptionError, configparser.NoSectionError):  # pragma: no cover
+        except (configparser.NoOptionError, configparser.NoSectionError):
             self.log_to_stdout = True
 
         self._lock = None
@@ -141,7 +140,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         self.logger.category = 'authentication'
         self.logger.source = 'openvpn'
         self.logger.tags = ['vpn', 'netfilter']
-        if os.geteuid() != 0:  # pragma: no cover
+        if os.geteuid() != 0:
             # Since everything in this class will modify iptables/ipset,
             # this library pretty much must run as root.
             #
@@ -150,23 +149,17 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             # to have a sudo allowance for the openvpn user.
             raise Exception('You must be root to use this library.')
 
-    def _ingest_config_from_file(self, conf_file=None):
+    def _ingest_config_from_file(self):
         """
             pull in config variables from a system file
         """
-        if conf_file is None:
-            conf_file = self.__class__.CONFIG_FILE_LOCATIONS
-        elif not isinstance(conf_file, list):  # pragma: no cover
-            conf_file = [conf_file]
         config = configparser.ConfigParser()
-        for filename in conf_file:
+        for filename in self.__class__.CONFIG_FILE_LOCATIONS:
             if os.path.isfile(filename):
                 try:
                     config.read(filename)
                     break
-                except:  # pragma: no cover  pylint: disable=bare-except
-                    # This bare-except is due to 2.7
-                    # limitations in configparser.
+                except (configparser.Error):
                     pass
         else:
             # Normally we demand there be a config, but in this case this
@@ -208,10 +201,11 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
     def _lock_timeout(self):
         """ A function to do timeouts """
         def __timeout_handler(_signum, _frame):
-            """ A noop function """
+            """ Convert SIGALRM to Exception """
+            #raise TimeoutError('SIGALRM timeout')
+            raise OSError('SIGALRM timeout')
 
-        # Save off the original signal handler for alarm, add in a dummy
-        # noop function.
+        # Save off the original signal handler for alarm, add in an exception-throwing function.
         original_handler = signal.signal(signal.SIGALRM, __timeout_handler)
         try:
             # Set an alarm for a few seconds out...
@@ -240,7 +234,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     self._lock = open(self.lockpath, 'a+')
                     # ... and try to lock it.
                     fcntl.flock(self._lock, fcntl.LOCK_EX)
-                except (IOError, OSError):  # pragma: no cover
+                except (IOError, OSError):
                     # We didn't lock this time.  Don't react.
                     # We'll try again.
                     pass
@@ -300,7 +294,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             command = command + ' >/dev/null 2>&1'
         # IMPROVEME: replace os.system
         status = os.system(command)
-        if status == -1:  # pragma: no cover
+        if status == -1:
             # This would require a test case where we misset iptables
             raise IptablesFailure(
                 'failed to invoke iptables ({c})'.format(c=command))
@@ -327,7 +321,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             command = command + ' >/dev/null 2>&1'
         # IMPROVEME: replace os.system
         status = os.system(command)
-        if status == -1:  # pragma: no cover
+        if status == -1:
             # This section covers an OS failure, this is almost
             # impossible to simulate.
             raise IpsetFailure(
@@ -550,7 +544,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 self.iptables(
                     '-D FORWARD -s {ip} -j DROP >/dev/null 2>&1'.format(
                         ip=self.client_ip), True)
-        except IptablesFailure:  # pragma: no cover
+        except IptablesFailure:
             # This is an almost-impossible exception to throw, as it would be
             # a 'we saw it but couldn't delete it' situation.
             self.logger.summary = ('FAIL: did not delete blocking rule, '
@@ -612,7 +606,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             self.logger.send()
             self.del_chain()
             # having now wiped the chain, check again:
-            if self.chain_exists():  # pragma: no cover
+            if self.chain_exists():
                 # It didn't delete.  Severe problem.
                 # This is almost impossible to test, as it means we
                 # tried to delete a chain, but it couldn't be deleted.
