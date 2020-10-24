@@ -87,6 +87,7 @@ install:
 	$(INSTALL) -m755 scripts/vpn-netfilter-cleanup-ip.py $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m440 sudoers.inc $(DESTDIR)/etc/sudoers.d/openvpn-netfilter
 	$(INSTALL) -m644 systemd-only-kill-process.conf $(DESTDIR)/etc/systemd/system/openvpn@.service.d/only-kill-process.conf
+	sed -i "1c#!$(PYTHON_BIN)" $(DESTDIR)$(PREFIX)/lib/openvpn/plugins/*.py $(DESTDIR)$(PREFIX)/bin/*.py
 
 clean:
 	rm -f netfilter_openvpn.pyc test/*.pyc
