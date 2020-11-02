@@ -52,6 +52,6 @@ for userip in $useriplist; do
     iptables -L "$userip" -v -n
     echo
     echo -e "\\n--- IPSET HASH TABLE ---"
-    ipset --list "$userip"
+    ipset -s --list "$userip"
     echo -e "--- end of $usercn $userip ---\\n\\n"
 done
