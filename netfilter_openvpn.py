@@ -452,7 +452,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             user=self.username_is[:23]), True)
         drop_rule = ('-A {chain} '
                      '{comment} '
-                     '-j DROP')
+                     '-j REJECT --reject-with icmp-admin-prohibited')
         self.iptables(drop_rule.format(
             comment=username_comment, chain=chain), True)
 

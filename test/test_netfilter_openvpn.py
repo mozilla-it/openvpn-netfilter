@@ -418,7 +418,8 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         # And the mandatory drops:
         mock_ipt.assert_any_call(('-A 2.3.4.5 -m comment --comment "larry at 2.3.4.5" '
                                   '-j LOG --log-prefix "DROP larry "'), True)
-        mock_ipt.assert_any_call('-A 2.3.4.5 -m comment --comment "larry at 2.3.4.5" -j DROP', True)
+        mock_ipt.assert_any_call(('-A 2.3.4.5 -m comment --comment "larry at 2.3.4.5" '
+                                  '-j REJECT --reject-with icmp-admin-prohibited'), True)
 
     def test_35_get_acls(self):
         ''' Test get_acls_for_user function '''
