@@ -16,11 +16,8 @@ import test.context  # pylint: disable=unused-import
 import mock
 from netaddr import IPNetwork
 import iamvpnlibrary
+from six.moves import configparser
 from netfilter_openvpn import IptablesFailure, IpsetFailure, NetfilterOpenVPN
-try:
-    import configparser
-except ImportError:  # pragma: no cover
-    from six.moves import configparser
 
 
 class TestExceptions(unittest.TestCase):

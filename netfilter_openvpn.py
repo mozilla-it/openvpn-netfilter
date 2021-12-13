@@ -55,11 +55,8 @@ import signal
 from contextlib import contextmanager
 import iamvpnlibrary
 import mozdef_client_config
+from six.moves import configparser
 sys.dont_write_bytecode = True
-try:
-    import configparser
-except ImportError:  # pragma: no cover
-    from six.moves import configparser
 
 
 class IptablesFailure(Exception):
