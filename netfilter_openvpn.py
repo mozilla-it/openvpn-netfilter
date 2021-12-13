@@ -375,14 +375,12 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 comment=comment))
         else:
             if acl.description:
-                comment = 'comment "{comment}"'.format(
+                comment = ' comment "{comment}"'.format(
                     comment=_commentstring
                 )
-            # ipset comments are not currently used due to
-            # https://bugzilla.redhat.com/show_bug.cgi?id=1496859
-            # pylint: disable=unused-format-string-argument
-            # entry = '--add {name} {dstip} {comment}'.format(
-            entry = '--add {name} {dstip}'.format(
+            else:
+                comment = ''
+            entry = '--add {name} {dstip}{comment}'.format(
                 name=name,
                 dstip=acl.address,
                 comment=comment
@@ -403,7 +401,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         chain = self._chain_name()
         # First thing, create empty placeholders:
         self.iptables('-N ' + chain)
-        self.ipset('--create ' + chain + ' hash:net')
+        self.ipset('--create ' + chain + ' hash:net comment')
         # Now, iterate over the list, which we sort by address
         # This assumes that all of the items in user_acls are
         # accepts, and thus order won't matter.

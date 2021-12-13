@@ -381,8 +381,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
             rule='rule4', address='5.6.7.11', portstring='', description='IPSET SET SET')
         with mock.patch.object(self.library, 'ipset') as mock_ips:
             self.library._build_firewall_rule('chain4', '1.2.3.4', '', ipset_acl2)
-        mock_ips.assert_called_once_with('--add chain4 5.6.7.11')
-        # This should be better, but comments are busted in older ipset
+        mock_ips.assert_called_once_with('--add chain4 5.6.7.11 comment "bob:rule4 ACL IPSET SET SET"')
 
     def test_31_create_rules(self):
         ''' Test create_user_rules function '''
@@ -400,7 +399,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         # This is written not in the order they were invoked, but in the order you'd read them.
         # Make the chains:
         mock_ipt.assert_any_call('-N 2.3.4.5')
-        mock_ips.assert_any_call('--create 2.3.4.5 hash:net')
+        mock_ips.assert_any_call('--create 2.3.4.5 hash:net comment')
         # allow established and ipsets:
         mock_ipt.assert_any_call(('-I 2.3.4.5 -m conntrack --ctstate ESTABLISHED -m comment '
                                   '--comment "larry at 2.3.4.5" -j ACCEPT'), True)
@@ -414,7 +413,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
                                   '--dports 80 -m comment --comment '
                                   '"larry:rule2 ACL I HAZ COMMENT" -j ACCEPT'))
         # One item in the ipset:
-        mock_ips.assert_any_call('--add 2.3.4.5 5.6.7.11')
+        mock_ips.assert_any_call('--add 2.3.4.5 5.6.7.11 comment "larry:rule4 ACL IPSET SET SET"')
         # And the mandatory drops:
         mock_ipt.assert_any_call(('-A 2.3.4.5 -m comment --comment "larry at 2.3.4.5" '
                                   '-j LOG --log-prefix "DROP larry "'), True)
