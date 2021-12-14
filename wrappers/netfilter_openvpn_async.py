@@ -79,52 +79,46 @@ def main():
     if not nf_object.acquire_lock():
         # never obtained a lock, get out
         return False
-    _log = nf_object.logger
     userstring = nf_object.username_string()
 
     if operation == 'add':
-        _log.summary = ('SUCCESS: VPN netfilter add upon connection for '
-                        '{}'.format(userstring))
-        _log.details = {'sourceipaddress': client_public_ip,
-                        'sourceport': client_port,
-                        'vpnip': client_private_ip,
-                        'username': userstring,
-                        'success': 'true'}
-        _log.send()
+
+        nf_object.send_event(summary=('SUCCESS: VPN netfilter add upon connection for '
+                                      '{}'.format(userstring)),
+                             details={'success': 'true',
+                                      'sourceipaddress': client_public_ip,
+                                      'sourceport': client_port,
+                                      'vpnip': client_private_ip,
+                                      'username': userstring,
+                                     })
         chain_work_status = nf_object.add_chain()
     elif operation == 'update':
-        _log.summary = ('SUCCESS: VPN netfilter add upon reconnection for '
-                        '{}'.format(userstring))
-        _log.details = {'sourceipaddress': client_public_ip,
-                        'sourceport': client_port,
-                        'vpnip': client_private_ip,
-                        'username': userstring,
-                        'success': 'true'}
-        _log.send()
+        nf_object.send_event(summary=('SUCCESS: VPN netfilter add upon reconnection for '
+                                      '{}'.format(userstring)),
+                             details={'success': 'true',
+                                      'sourceipaddress': client_public_ip,
+                                      'sourceport': client_port,
+                                      'vpnip': client_private_ip,
+                                      'username': userstring,
+                                     })
         chain_work_status = nf_object.update_chain()
     elif operation == 'delete':
         # There is no username here.
         # One could be found from the chain before we delete it if we care.
-        _log.summary = ('SUCCESS: VPN netfilter deletes upon disconnect')
-        _log.details = {'vpnip': client_private_ip,
-                        'success': 'true'}
-        _log.send()
+        nf_object.send_event(summary='SUCCESS: VPN netfilter deletes upon disconnect',
+                             details={'success': 'true',
+                                      'vpnip': client_private_ip,
+                                     })
         chain_work_status = nf_object.del_chain()
     else:
         # There is no username here.
-        _log.summary = ('FAIL: VPN netfilter failure due to'
-                        'unknown operation "{}"'.format(operation))
-        _log.details = {'error': 'true',
-                        'success': 'false'}
-        _log.send()
+        nf_object.send_event(summary=('FAIL: VPN netfilter failure due to'
+                                      'unknown operation "{}"'.format(operation)),
+                             details={'success': 'false',
+                                      'error': 'true',
+                                     })
         chain_work_status = False
 
-    if nf_object.log_to_stdout:
-        print(_log.syslog_convert())
-
-    # Print to stdout here because we want a local copy of the results.
-    # We could log to syslog, but that separates our files from the
-    # openvpn log to syslog.
     nf_object.free_lock()
     return chain_work_status
 

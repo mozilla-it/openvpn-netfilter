@@ -12,6 +12,9 @@ import unittest
 import os
 import time
 import tempfile
+import datetime
+import json
+import syslog
 import test.context  # pylint: disable=unused-import
 import mock
 from netaddr import IPNetwork
@@ -105,6 +108,52 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.assertEqual(result.get('aa', 'bb'), 'cc',
                          'Should have read a correct value.')
 
+    def test_07a_ingest_variables_bad(self):
+        """ With a poor config file, check we get the right things. """
+        test_reading_file = '/tmp/test-reader.txt'
+        with open(test_reading_file, 'w') as filepointer:
+            filepointer.write('[openvpn-netfilter]\n')
+            filepointer.write('syslog-events-facility = blah\n')
+        filepointer.close()
+        with mock.patch.object(NetfilterOpenVPN, 'CONFIG_FILE_LOCATIONS',
+                               new=[test_reading_file]), \
+                mock.patch('os.geteuid', return_value=0):
+            library = NetfilterOpenVPN()
+        os.remove(test_reading_file)
+        self.assertEqual(library.iptables_executable, '/sbin/iptables')
+        self.assertEqual(library.ipset_executable, '/usr/sbin/ipset')
+        self.assertEqual(library.lockpath, '/var/run/openvpn_netfilter.lock')
+        self.assertEqual(library.lockwaittime, 2)
+        self.assertEqual(library.lockretriesmax, 10)
+        self.assertEqual(library.event_send, False)
+        self.assertEqual(library.event_facility, syslog.LOG_AUTH)
+
+    def test_07b_ingest_variables_good(self):
+        """ With an actual config file, check we get the right things. """
+        test_reading_file = '/tmp/test-reader.txt'
+        with open(test_reading_file, 'w') as filepointer:
+            filepointer.write('[openvpn-netfilter]\n')
+            filepointer.write('iptables_executable = /foo/bar\n')
+            filepointer.write('ipset_executable = /foo/baz\n')
+            filepointer.write('LOCKPATH = /some/lock\n')
+            filepointer.write('LOCKWAITTIME = 6\n')
+            filepointer.write('LOCKRETRIESMAX = 12\n')
+            filepointer.write('syslog-events-send = True\n')
+            filepointer.write('syslog-events-facility = local0\n')
+        filepointer.close()
+        with mock.patch.object(NetfilterOpenVPN, 'CONFIG_FILE_LOCATIONS',
+                               new=[test_reading_file]), \
+                mock.patch('os.geteuid', return_value=0):
+            library = NetfilterOpenVPN()
+        os.remove(test_reading_file)
+        self.assertEqual(library.iptables_executable, '/foo/bar')
+        self.assertEqual(library.ipset_executable, '/foo/baz')
+        self.assertEqual(library.lockpath, '/some/lock')
+        self.assertEqual(library.lockwaittime, 6)
+        self.assertEqual(library.lockretriesmax, 12)
+        self.assertEqual(library.event_send, True)
+        self.assertEqual(library.event_facility, syslog.LOG_LOCAL0)
+
     def test_08_set_targets(self):
         """ test set_targets """
         self.library.set_targets()
@@ -179,8 +228,48 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         tmpfile = tempfile.NamedTemporaryFile()
         self.library.lockpath = tmpfile.name
         self.assertIsNone(self.library._lock)
-        with mock.patch('fcntl.flock', side_effect=IOError):
+        with mock.patch('fcntl.flock', side_effect=IOError), \
+                mock.patch.object(self.library, 'send_event') as mock_logger:
             self.assertFalse(self.library.acquire_lock())
+        # Lock failure triggers an event:
+        mock_logger.assert_called_once()
+
+    def test_13_log_event_nosend(self):
+        ''' Test the send_event method failing to send '''
+        self.library.event_send = False
+        with mock.patch('syslog.openlog') as mock_openlog, \
+                mock.patch('syslog.syslog') as mock_syslog:
+            self.library.send_event('some message', {'foo': 5}, 'CRITICAL')
+        mock_openlog.assert_not_called()
+        mock_syslog.assert_not_called()
+
+    def test_14_log_event_send(self):
+        ''' Test the send_event method tries to send '''
+        datetime_mock = mock.Mock(wraps=datetime.datetime)
+        datetime_mock.utcnow.return_value = datetime.datetime(2020, 12, 25, 13, 14, 15, 123456)
+        self.library.event_send = True
+        self.library.event_facility = syslog.LOG_LOCAL1
+        with mock.patch('syslog.openlog') as mock_openlog, \
+                mock.patch('syslog.syslog') as mock_syslog, \
+                mock.patch('datetime.datetime', new=datetime_mock), \
+                mock.patch('os.getpid', return_value=12345), \
+                mock.patch('socket.getfqdn', return_value='my.host.name'):
+            self.library.send_event('some message', {'foo': 5}, 'CRITICAL')
+        mock_openlog.assert_called_once_with(facility=syslog.LOG_LOCAL1)
+        mock_syslog.assert_called_once()
+        arg_passed_in = mock_syslog.call_args_list[0][0][0]
+        json_sent = json.loads(arg_passed_in)
+        details = json_sent['details']
+        self.assertEqual(json_sent['category'], 'authentication')
+        self.assertEqual(json_sent['processid'], 12345)
+        self.assertEqual(json_sent['severity'], 'CRITICAL')
+        self.assertIn('processname', json_sent)
+        self.assertEqual(json_sent['timestamp'], '2020-12-25T13:14:15.123456+00:00')
+        self.assertEqual(json_sent['hostname'], 'my.host.name')
+        self.assertEqual(json_sent['summary'], 'some message')
+        self.assertEqual(json_sent['source'], 'openvpn')
+        self.assertEqual(json_sent['tags'], ['vpn', 'netfilter'])
+        self.assertEqual(details, {'foo': 5})
 
     def test_15_chain_name(self):
         ''' Make sure we get a chain name based on the client_ip value '''
@@ -209,16 +298,15 @@ class TestNetfilterOpenVPN(unittest.TestCase):
     def test_18_add_chain(self):
         ''' Test add_chain function '''
         self.library.client_ip = '3.4.5.6'
-        mock_obj = mock.Mock()
-        self.library.logger = mock_obj
 
         # First assume horrific failure:
         with mock.patch.object(self.library, 'chain_exists', side_effect=[True, True]), \
-                mock.patch.object(self.library, 'del_chain') as mock_delchain:
+                mock.patch.object(self.library, 'del_chain') as mock_delchain, \
+                mock.patch.object(self.library, 'send_event') as mock_logger:
             result = self.library.add_chain()
         self.assertFalse(result, 'Unremovable chain must cause add_chain to be False')
         mock_delchain.assert_called_once_with()
-        self.assertEqual(self.library.logger.send.call_count, 2, 'Unremovable chain fails twice')
+        self.assertEqual(mock_logger.call_count, 2, 'Unremovable chain fails twice')
 
         # Now, assume simple success:
         with mock.patch.object(self.library, 'chain_exists', return_value=False), \
@@ -243,13 +331,16 @@ class TestNetfilterOpenVPN(unittest.TestCase):
                 mock.patch.object(self.library, 'get_acls_for_user',
                                   return_value='q') as mock_acls, \
                 mock.patch.object(self.library, 'create_user_rules') as mock_crea, \
-                mock.patch.object(self.library, 'remove_safety_block') as mock_block:
+                mock.patch.object(self.library, 'remove_safety_block') as mock_block, \
+                mock.patch.object(self.library, 'send_event') as mock_logger:
             result = self.library.add_chain()
         self.assertTrue(result, 'add_chain must be True even if it had to clean a chain out')
         mock_acls.assert_called_once_with()
         mock_crea.assert_called_once_with('q')
         mock_block.assert_called_once_with()
         mock_delchain.assert_called_once_with()
+        # Collision cleanout triggers an event:
+        mock_logger.assert_called_once()
         mock_ipt.assert_any_call('-A OUTPUT -d 3.4.5.6 -j 3.4.5.6', True)
         mock_ipt.assert_any_call('-A INPUT -s 3.4.5.6 -j 3.4.5.6', True)
         mock_ipt.assert_any_call('-A FORWARD -s 3.4.5.6 -j 3.4.5.6', True)
@@ -504,19 +595,19 @@ class TestNetfilterOpenVPN(unittest.TestCase):
             self.library.remove_safety_block()
         mock_ipt.assert_called_once_with('-C FORWARD -s 23456 -j DROP', False)
 
-        mock_obj = mock.Mock()
-        self.library.logger = mock_obj
         # Assume a delete works:
-        with mock.patch.object(self.library, 'iptables', side_effect=[True, True]) as mock_ipt:
+        with mock.patch.object(self.library, 'iptables', side_effect=[True, True]) as mock_ipt, \
+                mock.patch.object(self.library, 'send_event') as mock_logger:
             self.library.remove_safety_block()
         mock_ipt.assert_any_call('-C FORWARD -s 23456 -j DROP', False)
         mock_ipt.assert_any_call('-D FORWARD -s 23456 -j DROP >/dev/null 2>&1', True)
-        self.library.logger.send.assert_not_called()
+        mock_logger.assert_not_called()
 
         # Assume a delete blows out, SOMEHOW:
         with mock.patch.object(self.library, 'iptables',
-                               side_effect=[True, IptablesFailure]) as mock_ipt:
+                               side_effect=[True, IptablesFailure]) as mock_ipt, \
+                mock.patch.object(self.library, 'send_event') as mock_logger:
             self.library.remove_safety_block()
         mock_ipt.assert_any_call('-C FORWARD -s 23456 -j DROP', False)
         mock_ipt.assert_any_call('-D FORWARD -s 23456 -j DROP >/dev/null 2>&1', True)
-        self.library.logger.send.assert_called_once_with()
+        mock_logger.assert_called_once()

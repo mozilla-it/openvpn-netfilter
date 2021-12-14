@@ -56,10 +56,10 @@ setup(
                  'rules per connected user\n' +
                  'This package is built upon commit ' + git_version()),
     license='MPL',
-    keywords="mozdef client library",
+    keywords="vpn netfilter",
     url="https://github.com/mozilla-it/openvpn-netfilter",
     long_description=read('README.rst'),
-    install_requires=['iamvpnlibrary>=0.9.0', 'mozdef-client-config'],
+    install_requires=['iamvpnlibrary>=0.9.0'],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Topic :: System :: Logging",

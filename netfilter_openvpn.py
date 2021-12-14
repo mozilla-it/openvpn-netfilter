@@ -10,7 +10,6 @@
 # vim: set noexpandtab:ts=4
 # Requires:
 # python-iamvpnlibrary
-# python-mozdef_client_config
 #
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -52,9 +51,13 @@ import os
 import sys
 import fcntl
 import signal
+import datetime
+import socket
+import json
+import syslog
 from contextlib import contextmanager
+import pytz
 import iamvpnlibrary
-import mozdef_client_config
 from six.moves import configparser
 sys.dont_write_bytecode = True
 
@@ -119,24 +122,26 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             self.lockretriesmax = 10
 
         try:
-            self.log_to_stdout = self.configfile.getboolean(
-                'openvpn-netfilter', 'log_to_stdout')
+            self.event_send = self.configfile.getboolean(
+                'openvpn-netfilter', 'syslog-events-send')
         except (configparser.NoOptionError, configparser.NoSectionError):
-            self.log_to_stdout = True
+            self.event_send = False
+
+        try:
+            _base_facility = self.configfile.get(
+                'openvpn-netfilter', 'syslog-events-facility')
+        except (configparser.NoOptionError, configparser.NoSectionError):
+            _base_facility = 'auth'
+        try:
+            self.event_facility = getattr(syslog, 'LOG_{}'.format(_base_facility.upper()))
+        except (AttributeError):
+            self.event_facility = syslog.LOG_AUTH
 
         self._lock = None
         self.username_is = None
         self.username_as = None
         self.client_ip = None
         self.iam_object = None
-        self.logger = mozdef_client_config.ConfigedMozDefEvent()
-        # While 'authorization' might seem more correct (we are layering
-        # access upon a user after they have been authenticated), we are
-        # asked to put all login-related info under the category of
-        # 'authentication'.  So, don't change this without an EIS consult.
-        self.logger.category = 'authentication'
-        self.logger.source = 'openvpn'
-        self.logger.tags = ['vpn', 'netfilter']
         if os.geteuid() != 0:
             # Since everything in this class will modify iptables/ipset,
             # this library pretty much must run as root.
@@ -145,6 +150,29 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             # Since it's called from learn-address, that means you need
             # to have a sudo allowance for the openvpn user.
             raise Exception('You must be root to use this library.')
+
+    def send_event(self, summary, details, severity='INFO'):
+        '''
+            Send an event to our syslog setting, if set
+        '''
+        if not self.event_send:
+            return
+        output_json = {
+            'category': 'authentication',
+            'processid': os.getpid(),
+            'severity': severity,
+            'processname': sys.argv[0],
+            # Have to use pytz because py2 is terrible here.
+            'timestamp': pytz.timezone('UTC').localize(datetime.datetime.utcnow()).isoformat(),
+            'details': details,
+            'hostname': socket.getfqdn(),
+            'summary': summary,
+            'tags': ['vpn', 'netfilter'],
+            'source': 'openvpn',
+        }
+        syslog_message = json.dumps(output_json)
+        syslog.openlog(facility=self.event_facility)
+        syslog.syslog(syslog_message)
 
     def _ingest_config_from_file(self):
         """
@@ -242,14 +270,13 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     # reset _lock because we don't have one.
                     self._lock = None
                     # Tell the world we failed.
-                    self.logger.summary = ('FAIL: internal netfilter issue '
-                                           'on lock acquisition '
-                                           'of {}'.format(self.lockpath))
-                    self.logger.details = {
-                        # There is no username here
-                        'error': 'true',
-                        'success': 'false', }
-                    self.logger.send()
+                    self.send_event(summary=('FAIL: internal netfilter issue '
+                                             'on lock acquisition '
+                                             'of {}'.format(self.lockpath)),
+                                    details={'error': 'true',
+                                             'success': 'false',
+                                             # There is no username here
+                                            })
                     break
                 retries += 1
         return acquired
@@ -542,14 +569,14 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         except IptablesFailure:
             # This is an almost-impossible exception to throw, as it would be
             # a 'we saw it but couldn't delete it' situation.
-            self.logger.summary = ('FAIL: did not delete blocking rule, '
-                                   'potential security issue')
-            self.logger.set_severity_from_string('CRITICAL')
-            self.logger.details = {'vpnip': self.client_ip,
-                                   'error': 'true',
-                                   'username': self.username_is,
-                                   'success': 'false'}
-            self.logger.send()
+            self.send_event(summary=('FAIL: did not delete blocking rule, '
+                                     'potential security issue'),
+                            details={'error': 'true',
+                                     'success': 'false',
+                                     'vpnip': self.client_ip,
+                                     'username': self.username_is,
+                                    },
+                            severity='CRITICAL',)
 
     def add_chain(self):
         """
@@ -592,26 +619,26 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             # to ever clean it up except someone finding the bad setup.  And
             # to date, nobody ever has, which means this is a thin case and
             # nobody looks for it.  Log that this happened and then wipe it.
-            self.logger.summary = 'FAIL: Collision of adding a VPN ACL'
-            self.logger.details = {'vpnip': self.client_ip,
-                                   'error': 'true',
-                                   'username': self.username_is,
-                                   'success': 'false'}
-            self.logger.set_severity_from_string('WARNING')
-            self.logger.send()
+            self.send_event(summary='FAIL: Collision of adding a VPN ACL',
+                            details={'error': 'true',
+                                     'success': 'false',
+                                     'vpnip': self.client_ip,
+                                     'username': self.username_is,
+                                    },
+                            severity='WARNING',)
             self.del_chain()
             # having now wiped the chain, check again:
             if self.chain_exists():
                 # It didn't delete.  Severe problem.
                 # This is almost impossible to test, as it means we
                 # tried to delete a chain, but it couldn't be deleted.
-                self.logger.summary = 'FAIL: Undeletable VPN ACL'
-                self.logger.details = {'vpnip': self.client_ip,
-                                       'error': 'true',
-                                       'username': self.username_is,
-                                       'success': 'false'}
-                self.logger.set_severity_from_string('ERROR')
-                self.logger.send()
+                self.send_event(summary='FAIL: Undeletable VPN ACL',
+                                details={'error': 'true',
+                                         'success': 'false',
+                                         'vpnip': self.client_ip,
+                                         'username': self.username_is,
+                                        },
+                                severity='ERROR',)
                 return False
             # We cleaned the chain out, proceed with a new add.
         user_acls = self.get_acls_for_user()
