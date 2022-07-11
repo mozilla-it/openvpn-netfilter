@@ -56,9 +56,13 @@ def main():
     # Create the object.  Note that there's a "must be root"
     # enforcer in the object initializer.
     nf_object = netfilter_openvpn.NetfilterOpenVPN()
-    nf_object.set_targets(username_is=usercn,
-                          username_as=unsafe_username,
-                          client_ip=client_private_ip)
+    try:
+        nf_object.set_targets(username_is=usercn,
+                              username_as=unsafe_username,
+                              client_ip=client_private_ip)
+    except RuntimeError:
+        # This is likely "we couldn't connect to LDAP"
+        return False
 
     # This script is forked off from the openvpn process, and as such,
     # multiple copies of this script may be in flight at any one time.
