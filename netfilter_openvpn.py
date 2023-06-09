@@ -524,10 +524,23 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
 
     def chain_exists(self):
         """
+            Test existance of 'a chain' in the vague sense, as there are cases of botched/partial cleanup
+        """
+        return self.chain_exists_iptables() or self.chain_exists_ipset()
+
+    def chain_exists_iptables(self):
+        """
             Test existance of a chain via the iptables binary
         """
         chain = self._chain_name()
         return self.iptables('-L ' + chain, False)
+
+    def chain_exists_ipset(self):
+        """
+            Test existance of a chain via the ipset binary
+        """
+        chain = self._chain_name()
+        return self.ipset('list ' + chain, False)
 
     def add_safety_block(self):
         """

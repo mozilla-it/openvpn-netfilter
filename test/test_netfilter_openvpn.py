@@ -276,14 +276,41 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         self.library.client_ip = '12345'
         self.assertEqual(self.library._chain_name(), '12345')
 
-    def test_16_chain_exists(self):
-        ''' Make sure can figure out if a chain exists '''
+    def test_16_chain_exists_deeptest(self):
+        ''' Check for odd cases in teardown '''
+        self.library.client_ip = '12345'
+        with mock.patch.object(self.library, 'chain_exists_iptables', return_value=False), \
+                mock.patch.object(self.library, 'chain_exists_iptables', return_value=False):
+            result = self.library.chain_exists()
+        self.assertFalse(result)
+
+        with mock.patch.object(self.library, 'chain_exists_iptables', return_value=True), \
+                mock.patch.object(self.library, 'chain_exists_ipset', return_value=False):
+            result = self.library.chain_exists()
+        self.assertTrue(result)
+
+        with mock.patch.object(self.library, 'chain_exists_iptables', return_value=False), \
+                mock.patch.object(self.library, 'chain_exists_ipset', return_value=True):
+            result = self.library.chain_exists()
+        self.assertTrue(result)
+
+    def test_16_chain_exists_iptables(self):
+        ''' Make sure can figure out if an iptables chain exists '''
         self.library.client_ip = '12345'
         with mock.patch.object(self.library, 'iptables', return_value='x') as mock_ipt:
-            result = self.library.chain_exists()
+            result = self.library.chain_exists_iptables()
         # Get back whatever the iptables call is:
         self.assertEqual(result, 'x')
         mock_ipt.assert_called_once_with('-L 12345', False)
+
+    def test_16_chain_exists_ipset(self):
+        ''' Make sure can figure out if an ipset chain exists '''
+        self.library.client_ip = '12345'
+        with mock.patch.object(self.library, 'ipset', return_value='x') as mock_ips:
+            result = self.library.chain_exists_ipset()
+        # Get back whatever the ipset call is:
+        self.assertEqual(result, 'x')
+        mock_ips.assert_called_once_with('list 12345', False)
 
     def test_17_update_chain(self):
         ''' Make sure update_chain is THAT simple '''
