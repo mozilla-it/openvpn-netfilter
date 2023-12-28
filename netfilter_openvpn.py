@@ -262,7 +262,8 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 except (IOError, OSError):
                     # We didn't lock this time.  Don't react.
                     # We'll try again.
-                    pass
+                    # Close out the FH we opened but couldn't lock...
+                    self._lock.close()
                 else:
                     acquired = True
                 if retries >= self.lockretriesmax:
