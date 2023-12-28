@@ -55,10 +55,10 @@ import datetime
 import socket
 import json
 import syslog
+import configparser
 from contextlib import contextmanager
 import pytz
 import iamvpnlibrary
-from six.moves import configparser
 sys.dont_write_bytecode = True
 
 

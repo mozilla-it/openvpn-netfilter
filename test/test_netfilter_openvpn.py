@@ -15,11 +15,11 @@ import tempfile
 import datetime
 import json
 import syslog
+import configparser
 import test.context  # pylint: disable=unused-import
 import mock
 from netaddr import IPNetwork
 import iamvpnlibrary
-from six.moves import configparser
 from netfilter_openvpn import IptablesFailure, IpsetFailure, NetfilterOpenVPN
 
 
