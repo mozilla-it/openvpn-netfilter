@@ -57,7 +57,6 @@ import json
 import syslog
 import configparser
 from contextlib import contextmanager
-import pytz
 import iamvpnlibrary
 sys.dont_write_bytecode = True
 
@@ -162,8 +161,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             'processid': os.getpid(),
             'severity': severity,
             'processname': sys.argv[0],
-            # Have to use pytz because py2 is terrible here.
-            'timestamp': pytz.timezone('UTC').localize(datetime.datetime.utcnow()).isoformat(),
+            'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'details': details,
             'hostname': socket.getfqdn(),
             'summary': summary,
