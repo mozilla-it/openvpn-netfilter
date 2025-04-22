@@ -71,8 +71,9 @@ class TestNetfilterOpenVPN(unittest.TestCase):
 
     def test_04_ingest_no_config_file(self):
         """ With all missing config files, get an empty ConfigParser """
+        _not_a_real_file = '/tmp/no-such-file.txt'  # nosec hardcoded_tmp_directory
         with mock.patch.object(NetfilterOpenVPN, 'CONFIG_FILE_LOCATIONS',
-                               new=['/tmp/no-such-file.txt']):
+                               new=[_not_a_real_file]):
             result = self.library._ingest_config_from_file()
         self.assertIsInstance(result, configparser.ConfigParser,
                               'Did not create a config object')
@@ -91,12 +92,13 @@ class TestNetfilterOpenVPN(unittest.TestCase):
 
     def test_06_ingest_config_from_file(self):
         """ With an actual config file, get a populated ConfigParser """
-        test_reading_file = '/tmp/test-reader.txt'
+        _not_a_real_file = '/tmp/no-such-file.txt'  # nosec hardcoded_tmp_directory
+        test_reading_file = '/tmp/test-reader.txt'  # nosec hardcoded_tmp_directory
         with open(test_reading_file, 'w') as filepointer:
             filepointer.write('[aa]\nbb = cc\n')
         filepointer.close()
         with mock.patch.object(NetfilterOpenVPN, 'CONFIG_FILE_LOCATIONS',
-                               new=['/tmp/no-such-file.txt', test_reading_file]):
+                               new=[_not_a_real_file, test_reading_file]):
             result = self.library._ingest_config_from_file()
         os.remove(test_reading_file)
         self.assertIsInstance(result, configparser.ConfigParser,
@@ -110,7 +112,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
 
     def test_07a_ingest_variables_bad(self):
         """ With a poor config file, check we get the right things. """
-        test_reading_file = '/tmp/test-reader.txt'
+        test_reading_file = '/tmp/test-reader.txt'  # nosec hardcoded_tmp_directory
         with open(test_reading_file, 'w') as filepointer:
             filepointer.write('[openvpn-netfilter]\n')
             filepointer.write('syslog-events-facility = blah\n')
@@ -130,7 +132,7 @@ class TestNetfilterOpenVPN(unittest.TestCase):
 
     def test_07b_ingest_variables_good(self):
         """ With an actual config file, check we get the right things. """
-        test_reading_file = '/tmp/test-reader.txt'
+        test_reading_file = '/tmp/test-reader.txt'  # nosec hardcoded_tmp_directory
         with open(test_reading_file, 'w') as filepointer:
             filepointer.write('[openvpn-netfilter]\n')
             filepointer.write('iptables_executable = /foo/bar\n')
