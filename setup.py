@@ -52,7 +52,7 @@ setup(
     version=VERSION,
     author='Greg Cox',
     author_email='gcox@mozilla.com',
-    description=('A library to implement netfilter/iptables ' +
+    description=('A library to implement netfilter ' +
                  'rules per connected user\n' +
                  'This package is built upon commit ' + git_version()),
     license='MPL',

@@ -5,7 +5,7 @@
 Defaults:openvpn  env_keep += "untrusted_ip untrusted_port username"
 #
 # This is so openvpn can call the main python script with enough permissions
-# to do iptables efforts within it.
+# to call system-binary for OS-level changes.
 openvpn           ALL=NOPASSWD: /usr/lib/openvpn/plugins/netfilter_openvpn_async.py
-# This is for the sync script to do initial quick lockdowns via iptables.
+# This is for the sync script to do initial quick lockdowns.
 openvpn           ALL=NOPASSWD: /usr/lib/openvpn/plugins/netfilter_openvpn_sync.py

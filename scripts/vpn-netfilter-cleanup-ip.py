@@ -3,7 +3,7 @@
 # This is a script, not a module
 """
     Script to execute the delete_chain function and remove leftover
-    iptables/ipset debris as needed.
+    rule debris as needed.
 """
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
