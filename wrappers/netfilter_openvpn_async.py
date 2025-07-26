@@ -86,9 +86,8 @@ def main():
     userstring = nf_object.username_string()
 
     if operation == 'add':
-
         nf_object.send_event(summary=('SUCCESS: VPN netfilter add upon connection for '
-                                      '{}'.format(userstring)),
+                                      f'{userstring}'),
                              details={'success': 'true',
                                       'sourceipaddress': client_public_ip,
                                       'sourceport': client_port,
@@ -98,7 +97,7 @@ def main():
         chain_work_status = nf_object.add_chain()
     elif operation == 'update':
         nf_object.send_event(summary=('SUCCESS: VPN netfilter add upon reconnection for '
-                                      '{}'.format(userstring)),
+                                      f'{userstring}'),
                              details={'success': 'true',
                                       'sourceipaddress': client_public_ip,
                                       'sourceport': client_port,
@@ -117,7 +116,7 @@ def main():
     else:
         # There is no username here.
         nf_object.send_event(summary=('FAIL: VPN netfilter failure due to'
-                                      'unknown operation "{}"'.format(operation)),
+                                      f'unknown operation "{operation}"'),
                              details={'success': 'false',
                                       'error': 'true',
                                      })

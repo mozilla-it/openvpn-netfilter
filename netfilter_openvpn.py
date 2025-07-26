@@ -73,7 +73,7 @@ class IpsetFailure(Exception):
     """
 
 
-class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
+class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
     """
         This class exists to make a more testable interface into the
         adding and removing of per-user ACL rules.
@@ -132,8 +132,8 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         except (configparser.NoOptionError, configparser.NoSectionError):
             _base_facility = 'auth'
         try:
-            self.event_facility = getattr(syslog, 'LOG_{}'.format(_base_facility.upper()))
-        except (AttributeError):
+            self.event_facility = getattr(syslog, f'LOG_{_base_facility.upper()}')
+        except AttributeError:
             self.event_facility = syslog.LOG_AUTH
 
         self._lock = None
@@ -182,7 +182,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 try:
                     config.read(filename)
                     break
-                except (configparser.Error):
+                except configparser.Error:
                     pass
         else:
             # Normally we demand there be a config, but in this case this
@@ -217,8 +217,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             return self.username_is
         if self.username_is == self.username_as:
             return self.username_is
-        return '{user_is}-sudoing-as-{user_as}'.format(user_is=self.username_is,
-                                                       user_as=self.username_as)
+        return f'{self.username_is}-sudoing-as-{self.username_as}'
 
     @contextmanager
     def _lock_timeout(self):
@@ -254,8 +253,9 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             with self._lock_timeout():
                 try:
                     # Open our lockfile...
-                    self._lock = open(self.lockpath, 'a+')
+                    self._lock = open(self.lockpath, 'a+', encoding='utf-8')  # pylint: disable=consider-using-with
                     # ... and try to lock it.
+                    # The encoding doesn't matter, it's just to shut pylint up
                     fcntl.flock(self._lock, fcntl.LOCK_EX)
                 except (IOError, OSError):
                     # We didn't lock this time.  Don't react.
@@ -270,8 +270,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     self._lock = None
                     # Tell the world we failed.
                     self.send_event(summary=('FAIL: internal netfilter issue '
-                                             'on lock acquisition '
-                                             'of {}'.format(self.lockpath)),
+                                             f'on lock acquisition of {self.lockpath}'),
                                     details={'error': 'true',
                                              'success': 'false',
                                              # There is no username here
@@ -311,21 +310,17 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     Exception on error if raiseexception=True
                     False on error if raiseexception=False
         """
-        command = '{program} {arg}'.format(
-            program=self.iptables_executable, arg=argstr)
+        command = f'{self.iptables_executable} {argstr}'
         if not raiseexception:
             command = command + ' >/dev/null 2>&1'
         # IMPROVEME: replace os.system
         status = os.system(command)
         if status == -1:
             # This would require a test case where we misset iptables
-            raise IptablesFailure(
-                'failed to invoke iptables ({c})'.format(c=command))
+            raise IptablesFailure(f'failed to invoke iptables ({command})')
         status = os.WEXITSTATUS(status)
         if raiseexception and (status != 0):
-            raise IptablesFailure(
-                'iptables exited with status {status} ({c})'.format(
-                    status=status, c=command))
+            raise IptablesFailure(f'iptables exited with status {status} ({command})')
         if status != 0:
             return False
         return True
@@ -338,8 +333,7 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                     Exception on error if raiseexception=True
                     False on error if raiseexception=False
         """
-        command = '{program} {arg}'.format(
-            program=self.ipset_executable, arg=argstr)
+        command = f'{self.ipset_executable} {argstr}'
         if not raiseexception:
             command = command + ' >/dev/null 2>&1'
         # IMPROVEME: replace os.system
@@ -347,13 +341,10 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         if status == -1:
             # This section covers an OS failure, this is almost
             # impossible to simulate.
-            raise IpsetFailure(
-                'failed to invoke ipset ({c})'.format(c=command))
+            raise IpsetFailure('failed to invoke ipset ({command})')
         status = os.WEXITSTATUS(status)
         if raiseexception and (status != 0):
-            raise IpsetFailure(
-                'ipset exited with status {status} ({c})'.format(
-                    status=status, c=command))
+            raise IpsetFailure(f'ipset exited with status {status} ({command})')
         if status != 0:
             return False
         return True
@@ -373,41 +364,21 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         """
         comment = ''
         if acl.description:
-            _commentstring = '{user}:{group} ACL {desc}'.format(
-                user=self.username_is,
-                group=acl.rule,
-                desc=acl.description,
-            )
+            _commentstring = f'{self.username_is}:{acl.rule} ACL {acl.description}'
         if protocol and acl.portstring:
             if acl.description:
-                comment = '-m comment --comment "{comment}"'.format(
-                    comment=_commentstring
-                )
-            destport = '-m multiport --dports {ports}'.format(
-                ports=acl.portstring
-            )
-            protocol = '-p ' + protocol
-            rulestr = ('-A {name} -s {srcip} -d {dstip} '
-                       '{proto} {dport} {comment} -j ACCEPT')
-            self.iptables(rulestr.format(
-                name=name,
-                srcip=usersrcip,
-                dstip=acl.address,
-                dport=destport,
-                proto=protocol,
-                comment=comment))
+                comment = f'-m comment --comment "{_commentstring}"'
+            destport = f'-m multiport --dports {acl.portstring}'
+            protocol = f'-p {protocol}'
+            rulestr = (f'-A {name} -s {usersrcip} -d {acl.address} '
+                       f'{protocol} {destport} {comment} -j ACCEPT')
+            self.iptables(rulestr)
         else:
             if acl.description:
-                comment = ' comment "{comment}"'.format(
-                    comment=_commentstring
-                )
+                comment = f' comment "{_commentstring}"'
             else:
                 comment = ''
-            entry = '--add {name} {dstip}{comment}'.format(
-                name=name,
-                dstip=acl.address,
-                comment=comment
-            )
+            entry = f'--add {name} {acl.address}{comment}'
             self.ipset(entry)
 
     def create_user_rules(self, user_acls):
@@ -438,44 +409,27 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
                 self._build_firewall_rule(chain, self.client_ip,
                                           protocol, acl)
 
-        _commentstring = '{user} groups: {rulestr}'.format(
-            rulestr=unique_rules_string, user=self.username_is)
-        rules_comment = '-m comment --comment "{comment}"'.format(
-            comment=_commentstring[:255])
-        username_comment = '-m comment --comment "{user} at {ip}"'.format(
-            ip=self.client_ip, user=self.username_is)
+        _commentstring = f'{self.username_is} groups: {unique_rules_string}'
+        rules_comment = f'-m comment --comment "{_commentstring[:255]}"'
+        username_comment = f'-m comment --comment "{self.username_is} at {self.client_ip}"'
 
         # Insert glue to have the user's ipset high up...
-        use_ipset_rule = ('-I {chain} -s {ip} '
-                          '-m set --match-set {chain} dst '
-                          '{comment} '
-                          '-j ACCEPT')
-        self.iptables(use_ipset_rule.format(
-            ip=self.client_ip,
-            comment=rules_comment,
-            chain=chain), True)
+        use_ipset_rule = (f'-I {chain} -s {self.client_ip} -m set --match-set {chain} dst '
+                          f'{rules_comment} -j ACCEPT')
+        self.iptables(use_ipset_rule, True)
         # ... and also "accept any established connections" early on.
         # This is actually THE first, since it's an Insert after
         # another Insert.  In case that matters to you later.
-        allow_established_rule = ('-I {chain} '
-                                  '-m conntrack --ctstate ESTABLISHED '
-                                  '{comment} '
-                                  '-j ACCEPT')
-        self.iptables(allow_established_rule.format(
-            comment=username_comment, chain=chain), True)
-        log_drops_rule = ('-A {chain} '
-                          '{comment} '
-                          '-j LOG --log-prefix "DROP {user} "')
-        # log-prefix needs a space at the end              ^
-        self.iptables(log_drops_rule.format(
-            comment=username_comment,
-            chain=chain,
-            user=self.username_is[:23]), True)
-        drop_rule = ('-A {chain} '
-                     '{comment} '
+        allow_established_rule = (f'-I {chain} -m conntrack --ctstate ESTABLISHED '
+                                  f'{username_comment} -j ACCEPT')
+        self.iptables(allow_established_rule, True)
+        log_drops_rule = (f'-A {chain} {username_comment} '
+                          f'-j LOG --log-prefix "DROP {self.username_is[:23]} "')
+        # log-prefix needs a space at the end                                ^
+        self.iptables(log_drops_rule, True)
+        drop_rule = (f'-A {chain} {username_comment} '
                      '-j REJECT --reject-with icmp-admin-prohibited')
-        self.iptables(drop_rule.format(
-            comment=username_comment, chain=chain), True)
+        self.iptables(drop_rule, True)
 
     def get_acls_for_user(self):
         """
@@ -523,7 +477,8 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
 
     def chain_exists(self):
         """
-            Test existance of 'a chain' in the vague sense, as there are cases of botched/partial cleanup
+            Test existance of 'a chain' in the vague sense,
+            as there are cases of botched/partial cleanup
         """
         return self.chain_exists_iptables() or self.chain_exists_ipset()
 
@@ -560,24 +515,19 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         """
         # If this fails, we will raise, because something
         # is severely messed up.
-        self.iptables('-I FORWARD -s {ip} -j DROP'.format(
-            ip=self.client_ip))
+        self.iptables(f'-I FORWARD -s {self.client_ip} -j DROP')
 
     def remove_safety_block(self):
         """
             This function removes the iptables block against the vpn IP.
         """
         try:
-            if self.iptables(
-                    '-C FORWARD -s {ip} -j DROP'.format(
-                        ip=self.client_ip), False):
+            if self.iptables(f'-C FORWARD -s {self.client_ip} -j DROP', False):
                 # If there was nothing there, there's nothing to do.
                 # This function can be called when there is or is not
                 # a block in place, so, only complain if there was one
                 # which we could not delete.
-                self.iptables(
-                    '-D FORWARD -s {ip} -j DROP >/dev/null 2>&1'.format(
-                        ip=self.client_ip), True)
+                self.iptables(f'-D FORWARD -s {self.client_ip} -j DROP >/dev/null 2>&1', True)
         except IptablesFailure:
             # This is an almost-impossible exception to throw, as it would be
             # a 'we saw it but couldn't delete it' situation.
@@ -659,12 +609,9 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
         # This function continues on to tie them to the OS:
 
         chain = self._chain_name()
-        self.iptables('-A OUTPUT -d {ip} -j {chain}'.format(
-            ip=self.client_ip, chain=chain), True)
-        self.iptables('-A INPUT -s {ip} -j {chain}'.format(
-            ip=self.client_ip, chain=chain), True)
-        self.iptables('-A FORWARD -s {ip} -j {chain}'.format(
-            ip=self.client_ip, chain=chain), True)
+        self.iptables(f'-A OUTPUT -d {self.client_ip} -j {chain}', True)
+        self.iptables(f'-A INPUT -s {self.client_ip} -j {chain}', True)
+        self.iptables(f'-A FORWARD -s {self.client_ip} -j {chain}', True)
         self.remove_safety_block()
         return True
 
@@ -673,15 +620,12 @@ class NetfilterOpenVPN(object):  # pylint: disable=too-many-instance-attributes
             Delete the custom chain and all associated rules
         """
         chain = self._chain_name()
-        self.iptables('-D OUTPUT -d {ip} -j {chain}'.format(
-            ip=self.client_ip, chain=chain), False)
-        self.iptables('-D INPUT -s {ip} -j {chain}'.format(
-            ip=self.client_ip, chain=chain), False)
-        self.iptables('-D FORWARD -s {ip} -j {chain}'.format(
-            ip=self.client_ip, chain=chain), False)
-        self.iptables('-F {chain}'.format(chain=chain), False)
-        self.iptables('-X {chain}'.format(chain=chain), False)
-        self.ipset('--destroy {chain}'.format(chain=chain), False)
+        self.iptables(f'-D OUTPUT -d {self.client_ip} -j {chain}', False)
+        self.iptables(f'-D INPUT -s {self.client_ip} -j {chain}', False)
+        self.iptables(f'-D FORWARD -s {self.client_ip} -j {chain}', False)
+        self.iptables(f'-F {chain}', False)
+        self.iptables(f'-X {chain}', False)
+        self.ipset(f'--destroy {chain}', False)
         return True
 
     def update_chain(self):

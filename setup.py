@@ -37,14 +37,10 @@ def git_version():
         out = _minimal_ext_cmd(['git', 'rev-parse', 'HEAD'])
         git_revision = out.strip().decode('ascii')
     except OSError:
-        git_revision = u"Unknown"
+        git_revision = 'Unknown'
 
     return git_revision
 
-
-def read(fname):
-    """ Reads in a file """
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
     name='openvpn-netfilter',
@@ -58,7 +54,7 @@ setup(
     license='MPL',
     keywords="vpn netfilter",
     url="https://github.com/mozilla-it/openvpn-netfilter",
-    long_description=read('README.rst'),
+    long_description=open('README.rst', 'r', encoding='utf-8').read(),
     install_requires=['iamvpnlibrary>=0.9.0'],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
