@@ -6,6 +6,7 @@
 # Path to executables
 ; iptables_executable = /sbin/iptables
 ; ipset_executable = /usr/sbin/ipset
+; nftables_table = openvpn_netfilter
 
 # Script locking, so all work completes atomically with respect to
 # other invocations of this script

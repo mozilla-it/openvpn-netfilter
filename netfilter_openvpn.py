@@ -103,6 +103,12 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             self.ipset_executable = '/usr/sbin/ipset'
 
         try:
+            self.nftables_table = self.configfile.get(
+                'openvpn-netfilter', 'nftables_table')
+        except (configparser.NoOptionError, configparser.NoSectionError):
+            self.nftables_table = 'openvpn_netfilter'
+
+        try:
             self.lockpath = self.configfile.get(
                 'openvpn-netfilter', 'LOCKPATH')
         except (configparser.NoOptionError, configparser.NoSectionError):
