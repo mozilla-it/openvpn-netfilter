@@ -1,5 +1,3 @@
 - perhaps a better/dedicated rule cleanup script per user instead of calling the async.
 - reinstate deferred plugin support when openvpn has support for deferred learn-address plugins
 - implement ipv6
-- add nftables support
-- 

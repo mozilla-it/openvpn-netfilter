@@ -43,6 +43,7 @@ pythonrpm:  $(RPM_MAKE_TARGET)
 pythonrpm3:
 	fpm -s python -t rpm --python-bin $(PYTHON_BIN) --python-package-name-prefix $(PY_PACKAGE_PREFIX) --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
     -d iptables -d ipset \
+    -d python3-nftables \
     --iteration 1 setup.py
 	@rm -rf openvpn_netfilter.egg-info
 
