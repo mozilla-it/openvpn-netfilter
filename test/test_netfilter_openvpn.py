@@ -472,20 +472,20 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         mock_syscall.assert_called_once_with('ips foo6 >/dev/null 2>&1')
 
     def test_30_build_fw_rule(self):
-        ''' Test _build_firewall_rule function '''
+        ''' Test _build_firewall_rule_iptables function '''
         self.library.username_is = 'bob'
 
         iptables_acl1 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='', address='5.6.7.8', portstring='80', description='')
         with mock.patch.object(self.library, 'iptables') as mock_ipt:
-            self.library._build_firewall_rule('chain1', '1.2.3.4', 'tcp', iptables_acl1)
+            self.library._build_firewall_rule_iptables('chain1', '1.2.3.4', 'tcp', iptables_acl1)
         mock_ipt.assert_called_once_with(('-A chain1 -s 1.2.3.4 -d 5.6.7.8 -p tcp '
                                           '-m multiport --dports 80  -j ACCEPT'))
 
         iptables_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='rule2', address='5.6.7.9', portstring='80', description='I HAZ COMMENT')
         with mock.patch.object(self.library, 'iptables') as mock_ipt:
-            self.library._build_firewall_rule('chain2', '1.2.3.4', 'tcp', iptables_acl2)
+            self.library._build_firewall_rule_iptables('chain2', '1.2.3.4', 'tcp', iptables_acl2)
         mock_ipt.assert_called_once_with(('-A chain2 -s 1.2.3.4 -d 5.6.7.9 -p tcp -m multiport '
                                           '--dports 80 -m comment '
                                           '--comment "bob:rule2 ACL I HAZ COMMENT" '
@@ -494,13 +494,13 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         ipset_acl1 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='', address='5.6.7.10', portstring='', description='')
         with mock.patch.object(self.library, 'ipset') as mock_ips:
-            self.library._build_firewall_rule('chain3', '1.2.3.4', '', ipset_acl1)
+            self.library._build_firewall_rule_iptables('chain3', '1.2.3.4', '', ipset_acl1)
         mock_ips.assert_called_once_with('--add chain3 5.6.7.10')
 
         ipset_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='rule4', address='5.6.7.11', portstring='', description='IPSET SET SET')
         with mock.patch.object(self.library, 'ipset') as mock_ips:
-            self.library._build_firewall_rule('chain4', '1.2.3.4', '', ipset_acl2)
+            self.library._build_firewall_rule_iptables('chain4', '1.2.3.4', '', ipset_acl2)
         mock_ips.assert_called_once_with('--add chain4 5.6.7.11 comment "bob:rule4 ACL IPSET SET SET"')
 
     def test_31_create_rules(self):

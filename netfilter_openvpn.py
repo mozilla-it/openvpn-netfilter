@@ -91,6 +91,12 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         self.configfile = self._ingest_config_from_file()
 
         try:
+            self.nf_framework = self.configfile.get(
+                'openvpn-netfilter', 'framework')
+        except (configparser.NoOptionError, configparser.NoSectionError):
+            self.nf_framework = 'iptables'
+
+        try:
             self.iptables_executable = self.configfile.get(
                 'openvpn-netfilter', 'iptables_executable')
         except (configparser.NoOptionError, configparser.NoSectionError):
@@ -355,7 +361,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             return False
         return True
 
-    def _build_firewall_rule(self, name, usersrcip, protocol, acl):
+    def _build_firewall_rule_iptables(self, name, usersrcip, protocol, acl):
         """
             This function will select the best way to insert the rule
             in iptables.
@@ -368,6 +374,8 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             for a rule to land into.  As such, this is intended to be an
             internal-only function.
         """
+        if self.nf_framework != 'iptables':  # pragma: no cover
+            raise RuntimeError('invalid call into _build_firewall_rule_iptables')
         comment = ''
         if acl.description:
             _commentstring = f'{self.username_is}:{acl.rule} ACL {acl.description}'
@@ -399,43 +407,47 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         # The semicolon-delimited list of rules is used by the
         # vpn-fw-find-user utility script.
         chain = self._chain_name()
-        # First thing, create empty placeholders:
-        self.iptables('-N ' + chain)
-        self.ipset('--create ' + chain + ' hash:net comment')
-        # Now, iterate over the list, which we sort by address
-        # This assumes that all of the items in user_acls are
-        # accepts, and thus order won't matter.
-        for acl in sorted(user_acls, key=lambda acl: acl.address):
-            if bool(acl.portstring):
-                protocols = ['tcp', 'udp']
-            else:
-                protocols = ['']
+        if self.nf_framework == 'iptables':
+            # First thing, create empty placeholders:
+            self.iptables('-N ' + chain)
+            self.ipset('--create ' + chain + ' hash:net comment')
+            # Now, iterate over the list, which we sort by address
+            # This assumes that all of the items in user_acls are
+            # accepts, and thus order won't matter.
+            for acl in sorted(user_acls, key=lambda acl: acl.address):
+                if bool(acl.portstring):
+                    protocols = ['tcp', 'udp']
+                else:
+                    protocols = ['']
 
-            for protocol in protocols:
-                self._build_firewall_rule(chain, self.client_ip,
-                                          protocol, acl)
+                for protocol in protocols:
+                    self._build_firewall_rule_iptables(chain, self.client_ip,
+                                                       protocol, acl)
 
-        _commentstring = f'{self.username_is} groups: {unique_rules_string}'
-        rules_comment = f'-m comment --comment "{_commentstring[:255]}"'
-        username_comment = f'-m comment --comment "{self.username_is} at {self.client_ip}"'
+            _commentstring = f'{self.username_is} groups: {unique_rules_string}'
+            rules_comment = f'-m comment --comment "{_commentstring[:255]}"'
+            username_comment = f'-m comment --comment "{self.username_is} at {self.client_ip}"'
 
-        # Insert glue to have the user's ipset high up...
-        use_ipset_rule = (f'-I {chain} -s {self.client_ip} -m set --match-set {chain} dst '
-                          f'{rules_comment} -j ACCEPT')
-        self.iptables(use_ipset_rule, True)
-        # ... and also "accept any established connections" early on.
-        # This is actually THE first, since it's an Insert after
-        # another Insert.  In case that matters to you later.
-        allow_established_rule = (f'-I {chain} -m conntrack --ctstate ESTABLISHED '
-                                  f'{username_comment} -j ACCEPT')
-        self.iptables(allow_established_rule, True)
-        log_drops_rule = (f'-A {chain} {username_comment} '
-                          f'-j LOG --log-prefix "DROP {self.username_is[:23]} "')
-        # log-prefix needs a space at the end                                ^
-        self.iptables(log_drops_rule, True)
-        drop_rule = (f'-A {chain} {username_comment} '
-                     '-j REJECT --reject-with icmp-admin-prohibited')
-        self.iptables(drop_rule, True)
+            # Insert glue to have the user's ipset high up...
+            use_ipset_rule = (f'-I {chain} -s {self.client_ip} -m set --match-set {chain} dst '
+                              f'{rules_comment} -j ACCEPT')
+            self.iptables(use_ipset_rule, True)
+            # ... and also "accept any established connections" early on.
+            # This is actually THE first, since it's an Insert after
+            # another Insert.  In case that matters to you later.
+            allow_established_rule = (f'-I {chain} -m conntrack --ctstate ESTABLISHED '
+                                      f'{username_comment} -j ACCEPT')
+            self.iptables(allow_established_rule, True)
+            log_drops_rule = (f'-A {chain} {username_comment} '
+                              f'-j LOG --log-prefix "DROP {self.username_is[:23]} "')
+            # log-prefix needs a space at the end                                ^
+            self.iptables(log_drops_rule, True)
+            drop_rule = (f'-A {chain} {username_comment} '
+                         '-j REJECT --reject-with icmp-admin-prohibited')
+            self.iptables(drop_rule, True)
+        else:  # pragma: no cover
+            # Should be unreachable:
+            raise RuntimeError('invalid self.nf_framework')
 
     def get_acls_for_user(self):
         """
@@ -486,7 +498,10 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             Test existance of 'a chain' in the vague sense,
             as there are cases of botched/partial cleanup
         """
-        return self.chain_exists_iptables() or self.chain_exists_ipset()
+        if self.nf_framework == 'iptables':
+            return self.chain_exists_iptables() or self.chain_exists_ipset()
+        # Should be unreachable:
+        raise RuntimeError('invalid self.nf_framework')  # pragma: no cover
 
     def chain_exists_iptables(self):
         """
@@ -521,30 +536,38 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         """
         # If this fails, we will raise, because something
         # is severely messed up.
-        self.iptables(f'-I FORWARD -s {self.client_ip} -j DROP')
+        if self.nf_framework == 'iptables':
+            return self.iptables(f'-I FORWARD -s {self.client_ip} -j DROP')
+        # Should be unreachable:
+        raise RuntimeError('invalid self.nf_framework')  # pragma: no cover
 
     def remove_safety_block(self):
         """
             This function removes the iptables block against the vpn IP.
         """
-        try:
-            if self.iptables(f'-C FORWARD -s {self.client_ip} -j DROP', False):
-                # If there was nothing there, there's nothing to do.
-                # This function can be called when there is or is not
-                # a block in place, so, only complain if there was one
-                # which we could not delete.
-                self.iptables(f'-D FORWARD -s {self.client_ip} -j DROP >/dev/null 2>&1', True)
-        except IptablesFailure:
-            # This is an almost-impossible exception to throw, as it would be
-            # a 'we saw it but couldn't delete it' situation.
-            self.send_event(summary=('FAIL: did not delete blocking rule, '
-                                     'potential security issue'),
-                            details={'error': 'true',
-                                     'success': 'false',
-                                     'vpnip': self.client_ip,
-                                     'username': self.username_is,
-                                    },
-                            severity='CRITICAL',)
+        if self.nf_framework == 'iptables':
+            try:
+                if self.iptables(f'-C FORWARD -s {self.client_ip} -j DROP', False):
+                    # If there was nothing there, there's nothing to do.
+                    # This function can be called when there is or is not
+                    # a block in place, so, only complain if there was one
+                    # which we could not delete.
+                    self.iptables(f'-D FORWARD -s {self.client_ip} -j DROP >/dev/null 2>&1', True)
+                return True
+            except IptablesFailure:
+                # This is an almost-impossible exception to throw, as it would be
+                # a 'we saw it but couldn't delete it' situation.
+                self.send_event(summary=('FAIL: did not delete blocking rule, '
+                                         'potential security issue'),
+                                details={'error': 'true',
+                                         'success': 'false',
+                                         'vpnip': self.client_ip,
+                                         'username': self.username_is,
+                                        },
+                                severity='CRITICAL',)
+                return False
+        # Should be unreachable:
+        raise RuntimeError('invalid self.nf_framework')  # pragma: no cover
 
     def add_chain(self):
         """
@@ -615,9 +638,13 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         # This function continues on to tie them to the OS:
 
         chain = self._chain_name()
-        self.iptables(f'-A OUTPUT -d {self.client_ip} -j {chain}', True)
-        self.iptables(f'-A INPUT -s {self.client_ip} -j {chain}', True)
-        self.iptables(f'-A FORWARD -s {self.client_ip} -j {chain}', True)
+        if self.nf_framework == 'iptables':
+            self.iptables(f'-A OUTPUT -d {self.client_ip} -j {chain}', True)
+            self.iptables(f'-A INPUT -s {self.client_ip} -j {chain}', True)
+            self.iptables(f'-A FORWARD -s {self.client_ip} -j {chain}', True)
+        else:  # pragma: no cover
+            # Should be unreachable:
+            raise RuntimeError('invalid self.nf_framework')
         self.remove_safety_block()
         return True
 
@@ -626,12 +653,16 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             Delete the custom chain and all associated rules
         """
         chain = self._chain_name()
-        self.iptables(f'-D OUTPUT -d {self.client_ip} -j {chain}', False)
-        self.iptables(f'-D INPUT -s {self.client_ip} -j {chain}', False)
-        self.iptables(f'-D FORWARD -s {self.client_ip} -j {chain}', False)
-        self.iptables(f'-F {chain}', False)
-        self.iptables(f'-X {chain}', False)
-        self.ipset(f'--destroy {chain}', False)
+        if self.nf_framework == 'iptables':
+            self.iptables(f'-D OUTPUT -d {self.client_ip} -j {chain}', False)
+            self.iptables(f'-D INPUT -s {self.client_ip} -j {chain}', False)
+            self.iptables(f'-D FORWARD -s {self.client_ip} -j {chain}', False)
+            self.iptables(f'-F {chain}', False)
+            self.iptables(f'-X {chain}', False)
+            self.ipset(f'--destroy {chain}', False)
+        else:  # pragma: no cover
+            # Should be unreachable:
+            raise RuntimeError('invalid self.nf_framework')
         return True
 
     def update_chain(self):

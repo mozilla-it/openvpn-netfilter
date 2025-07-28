@@ -4,6 +4,7 @@
 # without any config file for netfilter_openvpn.
 #
 # Path to executables
+; framework = iptables
 ; iptables_executable = /sbin/iptables
 ; ipset_executable = /usr/sbin/ipset
 ; nftables_table = openvpn_netfilter
