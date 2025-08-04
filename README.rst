@@ -21,14 +21,14 @@ To minimize that impact, the synchronous script blocks all connections from the 
 The forked ```netfilter_openvpn_async.py``` then finishes the rule setup.
 
 Change the settings in /etc/netfilter_openvpn.conf if needed.
-Make sure that the paths of the 'iptables' and 'ipset' are correct for your OS.  Somewhat-conventional defaults are present without a config.
+Make sure that the paths of the 'iptables', 'ipset', and 'nft' are correct for your OS.  Somewhat-conventional defaults are present without a config.
 
 Obviously this filtering depends on having proper client routes for the network/IPs you allow, so consider the routes.
 
 Script logic
 ============
 
-learn-address is an OpenVPN hook called when the remote client is allocated an IP address by the VPN server side.  Given the user and now-allocated client IP, we load the netfilter (iptables/ipset) rules for that user and apply them to that client IP address.
+learn-address is an OpenVPN hook called when the remote client is allocated an IP address by the VPN server side.  Given the user and now-allocated client IP, we load the netfilter (iptables/x/nft) rules for that user and apply them to that client IP address.
 
 If the script fails for any reason, OpenVPN will deny packets to come through.
 

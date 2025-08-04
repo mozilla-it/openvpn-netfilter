@@ -4,7 +4,7 @@ PREFIX	:= /usr
 PACKAGE := openvpn-netfilter
 VERSION := 1.2.1
 .DEFAULT: coverage
-.PHONY: coverage coveragereport pep8 pylint pythonrpm rpm pythonrpm2 pythonrpm3 servicerpm pypi install clean
+.PHONY: coverage coveragereport pep8 pylint pythonrpm rpm pythonrpm3 servicerpm pypi install clean
 TEST_FLAGS_FOR_SUITE := -m unittest discover -f
 
 PLAIN_PYTHON = $(shell which python 2>/dev/null)
@@ -17,7 +17,7 @@ endif
 ifneq (, $(PLAIN_PYTHON))
   PYTHON_BIN = $(PLAIN_PYTHON)
   PY_PACKAGE_PREFIX = python
-  RPM_MAKE_TARGET = pythonrpm2
+  RPM_MAKE_TARGET = pythonrpm3
 endif
 
 COVERAGE2 = $(shell which coverage 2>/dev/null)
@@ -39,12 +39,6 @@ coveragereport:
 	$(COVERAGE) report -m netfilter_openvpn.py test/*.py
 
 pythonrpm:  $(RPM_MAKE_TARGET)
-
-pythonrpm2:
-	fpm -s python -t rpm --python-bin $(PYTHON_BIN) --python-package-name-prefix $(PY_PACKAGE_PREFIX) --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
-    -d iptables -d ipset \
-    --iteration 1 setup.py
-	@rm -rf openvpn_netfilter.egg-info
 
 pythonrpm3:
 	fpm -s python -t rpm --python-bin $(PYTHON_BIN) --python-package-name-prefix $(PY_PACKAGE_PREFIX) --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
@@ -69,8 +63,8 @@ pep8:
 	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -type f -name '*.py' -exec pep8 --show-source --max-line-length=100 {} \;
 
 pylint:
-	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -path ./test -prune -o -type f -name '*.py' -exec pylint -r no --disable=useless-object-inheritance,superfluous-parens --rcfile=/dev/null {} \;
-	@find ./test -type f -name '*.py' -exec pylint -r no --disable=useless-object-inheritance,protected-access,locally-disabled,too-many-public-methods --rcfile=/dev/null {} \;
+	@find ./* `git submodule --quiet foreach 'echo -n "-path ./$$path -prune -o "'` -path ./test -prune -o -type f -name '*.py' -exec pylint -r no --rcfile=/dev/null {} \;
+	@find ./test -type f -name '*.py' -exec pylint -r no --disable=protected-access,locally-disabled --rcfile=/dev/null {} \;
 
 pypi:
 	python setup.py sdist check upload --sign

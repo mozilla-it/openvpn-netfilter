@@ -68,12 +68,12 @@ def main():
     # multiple copies of this script may be in flight at any one time.
     # They're all going to be "taking a while" to query IAM or get their
     # turn to make edits, and those edits are shell calls out to the
-    # iptables and ipset executables.  There's a slim chance that we
+    # OS-based executables.  There's a slim chance that we
     # could see someone connect+disconnect, and that would lead to a
     # case of script A being in the middle of bringup, and B doing
     # takedown.  So we put a lock around this section of main (which,
     # let's be honest, means 'the whole script is locked') because
-    # we want each execution (multiple changes to iptables and ipset)
+    # we want each execution (multiple changes to on-box firewalling)
     # to run to completion without races with other instances of this.
     #
     # This is far from perfect.  human interference and/or system
@@ -86,9 +86,8 @@ def main():
     userstring = nf_object.username_string()
 
     if operation == 'add':
-
         nf_object.send_event(summary=('SUCCESS: VPN netfilter add upon connection for '
-                                      '{}'.format(userstring)),
+                                      f'{userstring}'),
                              details={'success': 'true',
                                       'sourceipaddress': client_public_ip,
                                       'sourceport': client_port,
@@ -98,7 +97,7 @@ def main():
         chain_work_status = nf_object.add_chain()
     elif operation == 'update':
         nf_object.send_event(summary=('SUCCESS: VPN netfilter add upon reconnection for '
-                                      '{}'.format(userstring)),
+                                      f'{userstring}'),
                              details={'success': 'true',
                                       'sourceipaddress': client_public_ip,
                                       'sourceport': client_port,
@@ -117,7 +116,7 @@ def main():
     else:
         # There is no username here.
         nf_object.send_event(summary=('FAIL: VPN netfilter failure due to'
-                                      'unknown operation "{}"'.format(operation)),
+                                      f'unknown operation "{operation}"'),
                              details={'success': 'false',
                                       'error': 'true',
                                      })
