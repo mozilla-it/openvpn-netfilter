@@ -1,0 +1,8 @@
+netaddr==1.3.0
+# The install here is more for your testing venv than anything.  I mean, really, 'just use the nftables that ships with the system' because you're interacting with the system, right?
+nftables @ git+https://git.netfilter.org/nftables@v1.1.3#subdirectory=py
+python-ldap==3.4.3
+######################
+# python-ldap dependencies
+pyasn1==0.6.1
+pyasn1_modules==0.4.2

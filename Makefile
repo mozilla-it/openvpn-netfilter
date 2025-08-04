@@ -20,13 +20,13 @@ ifneq (, $(PLAIN_PYTHON))
   RPM_MAKE_TARGET = pythonrpm3
 endif
 
-COVERAGE2 = $(shell which coverage 2>/dev/null)
 COVERAGE3 = $(shell which coverage-3 2>/dev/null)
-ifneq (, $(COVERAGE2))
-  COVERAGE = $(COVERAGE2)
-endif
+PLAIN_COVERAGE = $(shell which coverage 2>/dev/null)
 ifneq (, $(COVERAGE3))
   COVERAGE = $(COVERAGE3)
+endif
+ifneq (, $(PLAIN_COVERAGE))
+  COVERAGE = $(PLAIN_COVERAGE)
 endif
 
 
@@ -43,6 +43,7 @@ pythonrpm:  $(RPM_MAKE_TARGET)
 pythonrpm3:
 	fpm -s python -t rpm --python-bin $(PYTHON_BIN) --python-package-name-prefix $(PY_PACKAGE_PREFIX) --rpm-dist "$$(rpmbuild -E '%{?dist}' | sed -e 's#^\.##')" \
     -d iptables -d ipset \
+    -d python3-nftables \
     --iteration 1 setup.py
 	@rm -rf openvpn_netfilter.egg-info
 

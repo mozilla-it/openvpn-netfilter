@@ -1,12 +1,10 @@
+'''
+   tests that are specific to iptables
+'''
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-# Copyright (c) 2018 Mozilla Corporation
-"""
-   script testing script
-"""
-# This test file calls protected methods on the vpn
-# file, so, we tell pylint that we're cool with it globally:
+# Copyright (c) 2025 Mozilla Corporation
 
 import unittest
 import os
@@ -69,8 +67,10 @@ class TestNetfilterOpenVPNiptables(unittest.TestCase):
             library = NetfilterOpenVPN()
         os.remove(test_reading_file)
         self.assertEqual(library.nf_framework, 'iptables')
+        self.assertEqual(library.nft, None)
         self.assertEqual(library.iptables_executable, '/sbin/iptables')
         self.assertEqual(library.ipset_executable, '/usr/sbin/ipset')
+        #self.assertEqual(library.nftables_table, 'openvpn_netfilter')
         self.assertEqual(library.lockpath, '/var/run/openvpn_netfilter.lock')
         self.assertEqual(library.lockwaittime, 2)
         self.assertEqual(library.lockretriesmax, 10)
@@ -85,6 +85,7 @@ class TestNetfilterOpenVPNiptables(unittest.TestCase):
             filepointer.write('framework = iptables\n')
             filepointer.write('iptables_executable = /foo/bar\n')
             filepointer.write('ipset_executable = /foo/baz\n')
+            filepointer.write('nftables_table = some_tablename\n')
             filepointer.write('LOCKPATH = /some/lock\n')
             filepointer.write('LOCKWAITTIME = 6\n')
             filepointer.write('LOCKRETRIESMAX = 12\n')
@@ -97,8 +98,10 @@ class TestNetfilterOpenVPNiptables(unittest.TestCase):
             library = NetfilterOpenVPN()
         os.remove(test_reading_file)
         self.assertEqual(library.nf_framework, 'iptables')
+        self.assertEqual(library.nft, None)
         self.assertEqual(library.iptables_executable, '/foo/bar')
         self.assertEqual(library.ipset_executable, '/foo/baz')
+        #self.assertEqual(library.nftables_table, 'some_tablename')
         self.assertEqual(library.lockpath, '/some/lock')
         self.assertEqual(library.lockwaittime, 6)
         self.assertEqual(library.lockretriesmax, 12)

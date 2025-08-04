@@ -57,6 +57,7 @@ import json
 import syslog
 import configparser
 from contextlib import contextmanager
+import nftables
 import iamvpnlibrary
 sys.dont_write_bytecode = True
 
@@ -71,6 +72,10 @@ class IpsetFailure(Exception):
     """
         A named Exception to raise upon an ipset failure
     """
+
+
+class NftablesFailure(Exception):
+    ''' A named Exception to raise upon an nftables failure '''
 
 
 class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
@@ -161,6 +166,12 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             # Since it's called from learn-address, that means you need
             # to have a sudo allowance for the openvpn user.
             raise Exception('You must be root to use this library.')
+
+        if self.nf_framework == 'nftables':
+            self.nft = nftables.Nftables()
+        else:
+            self.nft = None
+
 
     def send_event(self, summary, details, severity='INFO'):
         '''
@@ -395,6 +406,80 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             entry = f'--add {name} {acl.address}{comment}'
             self.ipset(entry)
 
+    def _build_firewall_rule_nftables(self, name, usersrcip, protocol, acl):
+        """
+            This function will select the best way to insert the rule
+            in nftables.
+            If protocol and destination port are defined, create a
+            simple rule.
+            If only a destination net is set, insert it into the user's
+            chain's set.
+
+            This function assumes that a chain and set haive been created
+            for a rule to land into.  As such, this is intended to be an
+            internal-only function.
+        """
+        if self.nf_framework != 'nftables':  # pragma: no cover
+            raise RuntimeError('invalid call into _build_firewall_rule_nftables')
+        if protocol and acl.portstring:
+            dports = [int(x) for x in acl.portstring.split(',')]
+            comment = None
+            if acl.description:
+                comment = f'{self.username_is}:{acl.rule} ACL {acl.description}'
+            rule_def = {
+                'rule': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'chain': name,
+                    'comment': comment,
+                    'expr': [
+                        { 'match': {
+                            'op': '==',
+                            'left': { 'payload': { 'protocol': 'ip', 'field': 'saddr' }},
+                            'right': usersrcip,
+                        }},
+                        { 'match': {
+                            'op': '==',
+                            'left': { 'payload': { 'protocol': 'ip', 'field': 'daddr' }},
+                            'right': str(acl.address),
+                        }},
+                        { 'match': {
+                            'op': '==',
+                            'left': { 'payload': { 'protocol': protocol, 'field': 'dport' }},
+                            'right': { 'set': dports }
+                        }},
+                        { 'drop': None }
+                    ],
+                }
+            }
+            add_cmd = { 'nftables': [ { 'add':  rule_def } ] }
+            nft_rc, _output, error = self.nft.json_cmd(add_cmd)
+            if nft_rc != 0:
+                # IMPROVEME: this add shouldn't fail, we should log more about it.
+                raise NftablesFailure(f'rule add failed, ({error})')
+        else:
+            # set elements can't have comments in nftables
+            if len(acl.address) == 1:
+                # This is a single host.
+                elem_item = [ str(acl.address.network) ]
+            else:
+                # This is a range.
+                elem_item = [ { 'prefix': { 'addr': str(acl.address.network),
+                                            'len': acl.address.prefixlen } } ]
+            element_def = {
+                'element': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'name': name,
+                    'elem': elem_item,
+                }
+            }
+            add_cmd = { 'nftables': [ { 'add': element_def } ] }
+            nft_rc, _output, error = self.nft.json_cmd(add_cmd)
+            if nft_rc != 0:
+                # IMPROVEME: this add shouldn't fail, we should log more about it.
+                raise NftablesFailure(f'set add failed, ({error})')
+
     def create_user_rules(self, user_acls):
         """
             Given the ACLs for a particular user, create the rules that will
@@ -445,9 +530,187 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             drop_rule = (f'-A {chain} {username_comment} '
                          '-j REJECT --reject-with icmp-admin-prohibited')
             self.iptables(drop_rule, True)
+        elif self.nf_framework == 'nftables':
+            self._ensure_nftables_framework()
+            base_chain_def = {
+                'chain': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'name': chain,
+                }
+            }
+            base_set_def = {
+                'set': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    # CAUTION: v4-only here:
+                    'type': 'ipv4_addr',
+                    'name': chain,
+                    # flags interval means the set can contain CIDRs
+                    'flags': [ 'interval' ],
+                }
+            }
+            add_cmd = { 'nftables': [ { 'add': base_chain_def }, { 'add': base_set_def } ] }
+            nft_rc, _output, error = self.nft.json_cmd(add_cmd)
+            if nft_rc != 0:
+                raise NftablesFailure(f'chain creation failed, ({error})')
+
+            # Now, iterate over the list, which we sort by address
+            # This assumes that all of the items in user_acls are
+            # accepts, and thus order won't matter.
+            for acl in sorted(user_acls, key=lambda acl: acl.address):
+                if bool(acl.portstring):
+                    protocols = ['tcp', 'udp']
+                else:
+                    protocols = ['']
+
+                for protocol in protocols:
+                    self._build_firewall_rule_nftables(chain, self.client_ip,
+                                                       protocol, acl)
+
+            # Now begins the glue.
+            #
+            # Note, this chain is entered twice from the forward chain.
+            # 1  when client_ip is the saddr: this is the obvious case.
+            # 2  when client_ip is the daddr: this is less obvious.
+            #
+            # Why put the user rules all in one chain?  Well.  'Housekeeping, sorta'.
+            # We COULD do separate chains but that's kinda 'complexity for no reason'
+            # but I could be argued off that.
+            #
+            # First rule: "accept any established connections" early on.  This is
+            # primarily helpful for when you have an 'established' connection, so "it was okay
+            # before, should still be okay" in case 1, but also when DNS replies are headed
+            # back in, the 'related' kicks in on case 2.
+            #
+            # After that is the rule that says this client can go out to where it's allowed to.
+            # That's useful for case 1 but totally useless for case 2.  But it'll get skipped
+            # over quickly as not-applicable in evaluations, so, we just leave it here.
+            rule_established_def = {
+                'rule': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'chain': chain,
+                    'comment': f'{self.username_is} at {self.client_ip}',
+                    'expr': [
+                        { 'match': {
+                            'op': 'in',
+                            'left': { 'ct': {
+                                'key': 'state',
+                            }},
+                            'right': [
+                                'established',
+                                'related',
+                            ],
+                        }},
+                        { 'accept': None }
+                    ],
+                }
+            }
+            rule_set_def = {
+                'rule': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'chain': chain,
+                    'expr': [
+                        { 'match': {
+                            'op': '==',
+                            'left': { 'payload': {
+                                'protocol': 'ip',
+                                'field': 'saddr'
+                            }},
+                            'right': self.client_ip,
+                        }},
+                        { 'match': {
+                            'op': '==',
+                            'left': { 'payload': {
+                                'protocol': 'ip',
+                                'field': 'daddr'
+                            }},
+                            # 'chain' is also the name of the set:
+                            'right': f'@{chain}',
+                        }},
+                        { 'accept': None }
+                    ],
+                }
+            }
+            rule_log_def = {
+                'rule': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'chain': chain,
+                    'expr': [
+                        { 'log': {
+                            'prefix': f'DROP {self.username_is[:23]} '
+                        }},
+                    ],
+                }
+            }
+            rule_drop_def = {
+                'rule': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'chain': chain,
+                    'expr': [
+                        { 'reject': {
+                            'type': 'icmp',
+                            'expr': 'admin-prohibited'
+                        }},
+                    ],
+                }
+            }
+            add_cmd = { 'nftables': [ { 'add': rule_established_def },
+                                      { 'add': rule_set_def },
+                                      { 'add': rule_log_def },
+                                      { 'add': rule_drop_def } ] }
+            nft_rc, _output, error = self.nft.json_cmd(add_cmd)
+            if nft_rc != 0:
+                raise NftablesFailure(f'failed to add glue rules ({error})')
         else:  # pragma: no cover
             # Should be unreachable:
             raise RuntimeError('invalid self.nf_framework')
+
+    def _ensure_nftables_framework(self):
+        '''
+            In iptables, we have a main table and forward chain;
+            In nftables, we have to make it.  This is us laying the foundation.
+            This is invoked from a couple of places to make sure we're okay.
+        '''
+        if self.nf_framework != 'nftables':  # pragma: no cover
+            raise RuntimeError('invalid call into _ensure_nftables_framework')
+        table_def = {
+            'table': {
+                'family': 'inet',
+                'name': self.nftables_table,
+            }
+        }
+        list_table_cmd = { 'nftables': [ { 'list': table_def } ] }
+        nft_rc, _output, _error = self.nft.json_cmd(list_table_cmd)
+        if nft_rc != 0:
+            # Couldn't list the table.  It's probably not there.
+            add_table_cmd = { 'nftables': [ { 'add': table_def } ] }
+            _nft_rc, _output, _error = self.nft.json_cmd(add_table_cmd)
+            # IMPROVEME: what if this is bad?
+        chain_def = {
+            'chain': {
+                'family': 'inet',
+                'table': self.nftables_table,
+                'name': 'FORWARD',
+                'type': 'filter',
+                'hook': 'forward',
+                # Just before 'filter' priority:
+                'prio': -10,
+                'policy': 'drop',
+            }
+        }
+        list_chain_cmd = { 'nftables': [ { 'list': chain_def } ] }
+        nft_rc, _output, _error = self.nft.json_cmd(list_chain_cmd)
+        if nft_rc != 0:
+            # Couldn't list the chain.  It's probably not there.
+            add_chain_cmd = { 'nftables': [ { 'add': chain_def } ] }
+            _nft_rc, _output, _error = self.nft.json_cmd(add_chain_cmd)
+            # IMPROVEME: what if this is bad?
+        return True
 
     def get_acls_for_user(self):
         """
@@ -500,6 +763,8 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         """
         if self.nf_framework == 'iptables':
             return self.chain_exists_iptables() or self.chain_exists_ipset()
+        if self.nf_framework == 'nftables':
+            return self.chain_exists_nftables()
         # Should be unreachable:
         raise RuntimeError('invalid self.nf_framework')  # pragma: no cover
 
@@ -516,6 +781,22 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         """
         chain = self._chain_name()
         return self.ipset('list ' + chain, False)
+
+    def chain_exists_nftables(self):
+        ''' Test existance of a chain via the iptables library '''
+        chain = self._chain_name()
+        chain_def = {
+            'chain': {
+                'family': 'inet',
+                'table': self.nftables_table,
+                'name': chain,
+            }
+        }
+        list_cmd = { 'nftables': [ { 'list': chain_def } ] }
+        nft_rc, _output, _error = self.nft.json_cmd(list_cmd)
+        if nft_rc == 0:
+            return True
+        return False
 
     def add_safety_block(self):
         """
@@ -538,6 +819,31 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         # is severely messed up.
         if self.nf_framework == 'iptables':
             return self.iptables(f'-I FORWARD -s {self.client_ip} -j DROP')
+        if self.nf_framework == 'nftables':
+            self._ensure_nftables_framework()
+            rule_def = {
+                'rule': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'chain': 'FORWARD',
+                    'expr': [
+                        { 'match': {
+                            'op': '==',
+                            'left': { 'payload': {
+                                'protocol': 'ip',
+                                'field': 'saddr'
+                            }},
+                            'right': self.client_ip,
+                        }},
+                        { 'drop': None }
+                    ],
+                }
+            }
+            add_cmd = { 'nftables': [ { 'add': rule_def } ] }
+            nft_rc, _output, error = self.nft.json_cmd(add_cmd)
+            if nft_rc == 0:
+                return True
+            raise NftablesFailure(f'failed to add safety block ({error})')
         # Should be unreachable:
         raise RuntimeError('invalid self.nf_framework')  # pragma: no cover
 
@@ -566,6 +872,84 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                                         },
                                 severity='CRITICAL',)
                 return False
+        if self.nf_framework == 'nftables':
+            # Someday we'll be able to delete by reference.
+            #rule_def = {
+            #    'rule': {
+            #        'family': 'inet',
+            #        'table': self.nftables_table,
+            #        'chain': 'FORWARD',
+            #        'expr': [
+            #            { 'match': {
+            #                'op': '==',
+            #                'left': { 'payload': {
+            #                    'protocol': 'ip',
+            #                    'field': 'saddr'
+            #                }},
+            #                'right': self.client_ip,
+            #            }},
+            #            { 'drop': None }
+            #        ],
+            #    }
+            #}
+            # Til then, we have to look up the rules:
+            chain_holder_def = {
+                'chain': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'name': 'FORWARD',
+                }
+            }
+            list_cmd = { 'nftables': [ { 'list': chain_holder_def } ] }
+            nft_rc, output, error = self.nft.json_cmd(list_cmd)
+            if nft_rc != 0:
+                # If you don't get any rules back from the FORWARD chain, you
+                # kinda have to assume everything is busted.  I mean, this is not
+                # a complex search here that should ever fail.  So you're into
+                # edge cases like "out of memory" or "all of the table got deleted
+                # by a rogue actor.  At that point everything is suspect so even
+                # though we're aborting early and not looking for the user's
+                # chain+set, we're already so busted it's not tenable.
+                raise NftablesFailure(f'failed to list safety block ({error})')
+            expr_def = [
+                { 'match': {
+                    'op': '==',
+                    'left': { 'payload': {
+                        'protocol': 'ip',
+                        'field': 'saddr'
+                    }},
+                    'right': self.client_ip,
+                }},
+                { 'drop': None }
+            ]
+            delete_def = None
+            for chain_obj in output['nftables']:
+                rule = chain_obj.get('rule')
+                if not rule:
+                    continue
+                expr = rule.get('expr')
+                if (not expr) or (expr != expr_def):
+                    # "peephole" optimization breaks coverage tests if we don't put in a dummy
+                    # instruction here, unfixable bug in py: http://bugs.python.org/issue2506
+                    _x = 1
+                    continue
+                delete_def = {
+                    'rule': {
+                        'family': rule['family'],
+                        'table': rule['table'],
+                        'chain': rule['chain'],
+                        'handle': rule['handle'],
+                    }
+                }
+                break
+            else:
+                # Couldn't find a rule to delete, must not be one?
+                return True
+            delete_cmd = { 'nftables': [ { 'delete': delete_def } ] }
+            nft_rc, _output, error = self.nft.json_cmd(delete_cmd)
+            if nft_rc != 0:
+                raise NftablesFailure(f'failed to delete safety block ({error})')
+            return True
         # Should be unreachable:
         raise RuntimeError('invalid self.nf_framework')  # pragma: no cover
 
@@ -590,10 +974,10 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             # shouldn't be handing out an IP it hasn't reclaimed through
             # keepalive.  So that we're here means something is wrong,
             # probably a blowup in testing.  But, speculation: likely we
-            # have an iptables chain that got brought up on boot.
+            # have a chain that got brought up on boot.
             #
             # We can't append to / edit the existing rules.  That's right
-            # out.  That eaves us with two awful options:
+            # out.  That leaves us with two awful options:
             #
             # * leave the rules in place.  If, by some slim chance, the
             # existing chain belongs to a legit user and this is a hack
@@ -634,7 +1018,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             # We cleaned the chain out, proceed with a new add.
         user_acls = self.get_acls_for_user()
         self.create_user_rules(user_acls)
-        # At this point, an iptable and ipset for usersrcip are now in place.
+        # At this point, a chain and set for usersrcip are now in place.
         # This function continues on to tie them to the OS:
 
         chain = self._chain_name()
@@ -642,6 +1026,49 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             self.iptables(f'-A OUTPUT -d {self.client_ip} -j {chain}', True)
             self.iptables(f'-A INPUT -s {self.client_ip} -j {chain}', True)
             self.iptables(f'-A FORWARD -s {self.client_ip} -j {chain}', True)
+            # fallthrough
+        elif self.nf_framework == 'nftables':
+            rule_out_def = {
+                'rule': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'chain': 'FORWARD',
+                    'expr': [
+                        { 'match': {
+                            'op': '==',
+                            'left': { 'payload': {
+                                'protocol': 'ip',
+                                'field': 'saddr'
+                            }},
+                            'right': self.client_ip,
+                        }},
+                        { 'jump': { 'target': chain } }
+                    ],
+                }
+            }
+            rule_in_def = {
+                'rule': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'chain': 'FORWARD',
+                    'expr': [
+                        { 'match': {
+                            'op': '==',
+                            'left': { 'payload': {
+                                'protocol': 'ip',
+                                'field': 'daddr'
+                            }},
+                            'right': self.client_ip,
+                        }},
+                        { 'jump': { 'target': chain } }
+                    ],
+                }
+            }
+            add_cmd = { 'nftables': [ { 'add': rule_out_def }, { 'add': rule_in_def } ] }
+            nft_rc, _output, error = self.nft.json_cmd(add_cmd)
+            if nft_rc != 0:
+                raise NftablesFailure(f'failed to add chaining rules: ({error})')
+            # fallthrough
         else:  # pragma: no cover
             # Should be unreachable:
             raise RuntimeError('invalid self.nf_framework')
@@ -651,6 +1078,9 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
     def del_chain(self):
         """
             Delete the custom chain and all associated rules
+
+            We have to clean up the linking rules from add_chain
+            as well as the user items from create_user_rules
         """
         chain = self._chain_name()
         if self.nf_framework == 'iptables':
@@ -660,6 +1090,102 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             self.iptables(f'-F {chain}', False)
             self.iptables(f'-X {chain}', False)
             self.ipset(f'--destroy {chain}', False)
+        elif self.nf_framework == 'nftables':
+            # We can get rid of the user's chain and set by name,
+            # But we have to get the FORWARD rules by handle.
+
+            # First thing, let's look up and remove the 'FORWARD' rules.
+
+            chain_holder_def = {
+                'chain': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'name': 'FORWARD',
+                }
+            }
+            list_cmd = { 'nftables': [ { 'list': chain_holder_def } ] }
+            nft_rc, output, error = self.nft.json_cmd(list_cmd)
+            if nft_rc != 0:
+                # If you don't get any rules back from the FORWARD chain, you
+                # kinda have to assume everything is busted.  I mean, this is not
+                # a complex search here that should ever fail.  So you're into
+                # edge cases like "out of memory" or "all of the table got deleted
+                # by a rogue actor.  At that point everything is suspect so even
+                # though we're aborting early and not looking for the user's
+                # chain+set, we're already so busted it's not tenable.
+                raise NftablesFailure(f'failed to list FORWARD ({error})')
+            delete_defs = []
+
+            expr_out_def = [
+                { 'match': {
+                    'op': '==',
+                    'left': { 'payload': {
+                        'protocol': 'ip',
+                        'field': 'saddr'
+                    }},
+                    'right': self.client_ip,
+                }},
+                { 'jump': { 'target': chain } }
+            ]
+            expr_in_def = [
+                { 'match': {
+                    'op': '==',
+                    'left': { 'payload': {
+                        'protocol': 'ip',
+                        'field': 'daddr'
+                    }},
+                    'right': self.client_ip,
+                }},
+                { 'jump': { 'target': chain } }
+            ]
+            for chain_obj in output['nftables']:
+                rule = chain_obj.get('rule')
+                if not rule:
+                    continue
+                expr = rule.get('expr')
+                if (not expr) or (expr not in (expr_out_def, expr_in_def)):
+                    # "peephole" optimization breaks coverage tests if we don't put in a dummy
+                    # instruction here, unfixable bug in py: http://bugs.python.org/issue2506
+                    _x = 1
+                    continue
+                delete_defs.append({
+                    'rule': {
+                        'family': rule['family'],
+                        'table': rule['table'],
+                        'chain': rule['chain'],
+                        'handle': rule['handle'],
+                    }
+                })
+            # Here's a fallthrough.  We could've matched nothing.  That would be unusual,
+            # but if there's nothing to delete, then there's nothing to delete.
+            for delete_def in delete_defs:
+                del_cmd = { 'nftables': [ { 'delete': delete_def } ] }
+                _nft_rc, _output, _error = self.nft.json_cmd(del_cmd)
+                # IMPROVEME
+
+            # After those two rules are gone, we can do the delete of the user's
+            # chain and set by name.
+
+            base_chain_def = {
+                'chain': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    'name': chain,
+                }
+            }
+            base_set_def = {
+                'set': {
+                    'family': 'inet',
+                    'table': self.nftables_table,
+                    # CAUTION: v4-only here:
+                    'type': 'ipv4_addr',
+                    'name': chain,
+                }
+            }
+            del_cmd = { 'nftables': [ { 'delete': base_chain_def },
+                                      { 'delete': base_set_def } ] }
+            _nft_rc, _output, _error = self.nft.json_cmd(del_cmd)
+            # We don't check the output here; these 'just work'
         else:  # pragma: no cover
             # Should be unreachable:
             raise RuntimeError('invalid self.nf_framework')
