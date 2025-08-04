@@ -20,13 +20,13 @@ ifneq (, $(PLAIN_PYTHON))
   RPM_MAKE_TARGET = pythonrpm3
 endif
 
-COVERAGE2 = $(shell which coverage 2>/dev/null)
 COVERAGE3 = $(shell which coverage-3 2>/dev/null)
-ifneq (, $(COVERAGE2))
-  COVERAGE = $(COVERAGE2)
-endif
+PLAIN_COVERAGE = $(shell which coverage 2>/dev/null)
 ifneq (, $(COVERAGE3))
   COVERAGE = $(COVERAGE3)
+endif
+ifneq (, $(PLAIN_COVERAGE))
+  COVERAGE = $(PLAIN_COVERAGE)
 endif
 
 
