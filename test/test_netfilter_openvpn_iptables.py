@@ -1,12 +1,10 @@
+'''
+   tests that are specific to iptables
+'''
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-# Copyright (c) 2018 Mozilla Corporation
-"""
-   script testing script
-"""
-# This test file calls protected methods on the vpn
-# file, so, we tell pylint that we're cool with it globally:
+# Copyright (c) 2025 Mozilla Corporation
 
 import unittest
 import os
