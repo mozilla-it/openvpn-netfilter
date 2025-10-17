@@ -20,15 +20,7 @@ ifneq (, $(PLAIN_PYTHON))
   RPM_MAKE_TARGET = pythonrpm3
 endif
 
-COVERAGE3 = $(shell which coverage-3 2>/dev/null)
-PLAIN_COVERAGE = $(shell which coverage 2>/dev/null)
-ifneq (, $(COVERAGE3))
-  COVERAGE = $(COVERAGE3)
-endif
-ifneq (, $(PLAIN_COVERAGE))
-  COVERAGE = $(PLAIN_COVERAGE)
-endif
-
+COVERAGE = $(shell which coverage 2>/dev/null)
 
 coverage:
 	$(COVERAGE) run $(TEST_FLAGS_FOR_SUITE) -s test
