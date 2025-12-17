@@ -64,7 +64,7 @@ pypi:
 
 install:
 	mkdir -p $(DESTDIR)$(PREFIX)/lib/openvpn/plugins
-	mkdir -p $(DESTDIR)/etc/systemd/system/openvpn@.service.d
+	mkdir -p $(DESTDIR)/etc/systemd/system/openvpn-server@.service.d
 	mkdir -p $(DESTDIR)/etc/sudoers.d
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m755 wrappers/netfilter_openvpn.sh $(DESTDIR)$(PREFIX)/lib/openvpn/plugins/
@@ -73,7 +73,7 @@ install:
 	$(INSTALL) -m755 scripts/vpn-fw-find-user.sh $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m755 scripts/vpn-netfilter-cleanup-ip.py $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m440 sudoers.inc $(DESTDIR)/etc/sudoers.d/openvpn-netfilter
-	$(INSTALL) -m644 systemd-only-kill-process.conf $(DESTDIR)/etc/systemd/system/openvpn@.service.d/only-kill-process.conf
+	$(INSTALL) -m644 systemd-graceful-cleanup.conf $(DESTDIR)/etc/systemd/system/openvpn-server@.service.d/graceful-cleanup.conf
 	sed -i "1c#!$(PYTHON_BIN)" $(DESTDIR)$(PREFIX)/lib/openvpn/plugins/*.py $(DESTDIR)$(PREFIX)/bin/*.py
 
 clean:
