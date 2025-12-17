@@ -78,7 +78,7 @@ install:
 
 clean:
 	rm -f netfilter_openvpn.pyc test/*.pyc
-	rm -rf __pycache__
+	rm -rf __pycache__ test/__pycache__
 	rm -rf dist sdist build
 	rm -rf openvpn_netfilter.egg-info
 	rm -rf tmp
