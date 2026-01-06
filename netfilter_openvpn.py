@@ -733,6 +733,19 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         _seen_nets = []
         for acl in raw_acls:
 
+            if acl.address.version == 4:
+                pass
+            elif acl.address.version == 6:
+                # IMPROVEME: handle ipv6 ; silent noop for now
+                continue
+            else:  # pragma: no cover
+                self.send_event(summary=(f'WARNING: unknown IP address, {acl.address} '
+                                         f'version {acl.address.version}'),
+                                details={'error': 'false',
+                                         'success': 'false',
+                                        })
+                continue
+
             for _prev_acl in _seen_nets:
                 if acl.address in _prev_acl:
                     # This ACL's address space is fully contained

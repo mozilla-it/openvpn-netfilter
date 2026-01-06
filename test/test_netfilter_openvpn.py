@@ -224,35 +224,42 @@ class TestNetfilterOpenVPN(unittest.TestCase):
             result = self.library.get_acls_for_user()
         self.assertEqual(result, [], 'User without IAM ACLs must get []')
 
-        # stanalone ACL, WITH a port,    WITH    a larger group to absorb it (but can't)
+        # standalone ACL, WITH a port,    WITH    a larger group to absorb it (but can't)
         acl1 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.10.10/32'),
                                                   portstring='80', description='')
-        # stanalone ACL, WITH a port,    WITH    a larger group to absorb it (and it could be)
+        # standalone ACL, WITH a port,    WITH    a larger group to absorb it (and it could be)
         acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.10.12/32'),
                                                   portstring='443', description='')
-        # stanalone ACL, WITH a port,    WITHOUT a larger group to absorb it.
+        # standalone ACL, WITH a port,    WITHOUT a larger group to absorb it.
         acl3 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.40.10/32'),
                                                   portstring='80', description='')
-        # stanalone ACL, WITHOUT a port, WITH    a larger group to absorb it.
+        # standalone ACL, WITHOUT a port, WITH    a larger group to absorb it.
         acl4 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.20.11/32'),
                                                   portstring='', description='')
-        # stanalone ACL, WITHOUT a port, WITHOUT a larger group to absorb it.
+        # standalone ACL, WITHOUT a port, WITHOUT a larger group to absorb it.
         acl5 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.30.50.70/32'),
                                                   portstring='', description='')
-        # CIDR ACL,      WITH a port,    WITH    a larger group to absorb it (but can't)
+        # CIDR ACL,       WITH a port,    WITH    a larger group to absorb it (but can't)
         acl6 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.10.0/27'),
                                                   portstring='443', description='')
-        # CIDR ACL,      WITH a port,    WITH    a larger group to absorb it (and it could be)
+        # CIDR ACL,       WITH a port,    WITH    a larger group to absorb it (and it could be)
         acl7 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.30.0/27'),
                                                   portstring='443', description='')
-        # CIDR ACL,      WITH a port,    WITHOUT a larger group to absorb it.
+        # CIDR ACL,       WITH a port,    WITHOUT a larger group to absorb it.
         acl8 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.30.0/24'),
                                                   portstring='443', description='')
-        # CIDR ACL,      WITHOUT a port, WITH    a larger group to absorb it.
+        # CIDR ACL,       WITHOUT a port, WITH    a larger group to absorb it.
         acl9 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.20.0/27'),
                                                   portstring='', description='')
-        # CIDR ACL,      WITHOUT a port, WITHOUT a larger group to absorb it.
+        # CIDR ACL,       WITHOUT a port, WITHOUT a larger group to absorb it.
         acl10 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('10.10.20.0/24'),
+                                                   portstring='', description='')
+        # 2001:db8::/32 is a documentation range
+        # standalone v6,  WITHOUT a port, WITH    a larger group to absorb it (but can't)
+        acl11 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('2001:db8:1:2::3/32'),
+                                                   portstring='', description='')
+        # standalone v6,  WITHOUT a port, WITHOUT a larger group to absorb it.
+        acl12 = iamvpnlibrary.iamvpnbase.ParsedACL(rule='', address=IPNetwork('2001:db8::/32'),
                                                    portstring='', description='')
 
         # portstring-focused absorbing:
@@ -275,4 +282,10 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         # collapsing of ranges:
         with mock.patch.object(self.library.iam_object, 'get_allowed_vpn_acls',
                                return_value=[acl3, acl4, acl9, acl10]):
+            self.assertEqual(self.library.get_acls_for_user(), [acl10, acl3])
+
+        # collapsing of ranges with v6 in the mix.
+        # This test indicates the library doesn't support ipv6.  IMPROVEME
+        with mock.patch.object(self.library.iam_object, 'get_allowed_vpn_acls',
+                               return_value=[acl3, acl4, acl9, acl10, acl11, acl12]):
             self.assertEqual(self.library.get_acls_for_user(), [acl10, acl3])
