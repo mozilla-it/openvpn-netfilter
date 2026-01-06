@@ -2,7 +2,7 @@ INSTALL	:= install
 DESTDIR	:= /
 PREFIX	:= /usr
 PACKAGE := openvpn-netfilter
-VERSION := 1.4.0
+VERSION := 1.4.1
 .DEFAULT: coverage
 .PHONY: coverage coveragereport pep8 pylint pythonrpm rpm pythonrpm3 servicerpm pypi install clean
 TEST_FLAGS_FOR_SUITE := -m unittest discover -f
