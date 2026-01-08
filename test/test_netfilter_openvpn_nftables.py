@@ -358,7 +358,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'tcp', 'field': 'dport'}},
                                   'right': {'set': [80]}}},
-                                       {'drop': None}]}}}]})
+                                       {'accept': None}]}}}]})
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (-1, '', 'someerror')
             with self.assertRaises(NftablesFailure,
@@ -387,7 +387,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'tcp', 'field': 'dport'}},
                                   'right': {'set': [80]}}},
-                                       {'drop': None}]}}}]})
+                                       {'accept': None}]}}}]})
 
         ip_set_acl1 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='', address=IPNetwork('5.6.7.0/24'), portstring='', description='')
@@ -573,7 +573,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                             'left': {'payload': {'protocol': test_proto, 'field': 'dport'}},
                             'right': {'set': [80]}}
                         },
-                        {'drop': None}]}
+                        {'accept': None}]}
                 }}
                 ]}
             )

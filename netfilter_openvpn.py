@@ -448,7 +448,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                             'left': { 'payload': { 'protocol': protocol, 'field': 'dport' }},
                             'right': { 'set': dports }
                         }},
-                        { 'drop': None }
+                        { 'accept': None }
                     ],
                 }
             }
