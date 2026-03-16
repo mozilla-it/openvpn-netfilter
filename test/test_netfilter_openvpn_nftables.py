@@ -659,7 +659,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
 
     def test_add_safety(self):
         ''' Test add_safety_block function '''
-        self.library.client_ip = '12345'
+        self.library.client_ip = '10.20.30.40'
 
         # Assume an add works:
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft, \
@@ -672,7 +672,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                               'chain': 'FORWARD',
                               'expr': [{'match': {'op': '==',
                                                   'left': {'payload': {'protocol': 'ip', 'field': 'saddr'}},
-                                                  'right': '12345'}},
+                                                  'right': '10.20.30.40'}},
                                         {'drop': None}]}}}]})
         self.assertTrue(res, 'add_safety_block shoule be true on success')
 
@@ -687,7 +687,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
 
     def test_del_safety(self):
         ''' Test add_safety_block function '''
-        self.library.client_ip = '23456'
+        self.library.client_ip = '20.30.40.50'
 
         good_rule_to_delete = {
             'family': 'inet',
@@ -731,7 +731,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         #                         'chain': 'FORWARD',
         #                         'expr': [{'match': {'op': '==',
         #                                             'left': {'payload': {'protocol': 'ip', 'field': 'saddr'}},
-        #                                             'right': '23456'}},
+        #                                             'right': '20.30.40.50'}},
         #                                   {'drop': None}]}}}]})
 
         # Assume a delete finds no rule to delete:
