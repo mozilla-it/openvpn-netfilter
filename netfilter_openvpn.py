@@ -57,6 +57,7 @@ import json
 import syslog
 import configparser
 from contextlib import contextmanager
+import netaddr
 import nftables
 import iamvpnlibrary
 sys.dont_write_bytecode = True
@@ -171,6 +172,24 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             self.nft = nftables.Nftables()
         else:
             self.nft = None
+
+
+    @staticmethod
+    def ip_family(ip_in):
+        '''
+            Find the nftables address family of an IP
+        '''
+        try:
+            if not isinstance(ip_in, netaddr.IPNetwork):
+                ip_in = netaddr.IPNetwork(ip_in)
+        except netaddr.core.AddrFormatError as exc:
+            raise ValueError(f'IP {ip_in} is not an IP address') from exc
+        else:
+            if ip_in.ip.version == 4:
+                return 'ip'
+            if ip_in.ip.version == 6:
+                return 'ip6'
+        raise ValueError(f'IP {ip_in} is not ipv4 or ipv6')  # pragma: no cover
 
 
     def send_event(self, summary, details, severity='INFO'):

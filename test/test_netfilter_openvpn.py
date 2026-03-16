@@ -16,7 +16,7 @@ import syslog
 import configparser
 import test.context  # pylint: disable=unused-import
 import mock
-from netaddr import IPNetwork
+from netaddr import IPAddress, IPNetwork
 import iamvpnlibrary
 from netfilter_openvpn import NetfilterOpenVPN
 
@@ -212,6 +212,21 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         ''' Make sure we get a chain name based on the client_ip value '''
         self.library.client_ip = '12345'
         self.assertEqual(self.library._chain_name(), '12345')
+
+    def test_20_ip_family_4(self):
+        ''' Make sure we get good ip_family strings from ipv4 '''
+        self.assertEqual(self.library.ip_family('10.20.30.40'), 'ip')
+        self.assertEqual(self.library.ip_family(IPAddress('10.20.30.40')), 'ip')
+
+    def test_20_ip_family_6(self):
+        ''' Make sure we get good ip_family strings from ipv6 '''
+        self.assertEqual(self.library.ip_family('2001:db8::4'), 'ip6')
+        self.assertEqual(self.library.ip_family(IPAddress('2001:db8::4:5')), 'ip6')
+
+    def test_20_ip_family_fail(self):
+        ''' Make sure we blow up ip_family with bad strings '''
+        with self.assertRaises(ValueError):
+            self.library.ip_family('not-an-ip')
 
     def test_35_get_acls(self):
         ''' Test get_acls_for_user function '''
