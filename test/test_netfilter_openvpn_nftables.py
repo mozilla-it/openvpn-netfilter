@@ -155,11 +155,10 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         mock_a.assert_called_once_with()
 
 
-    def test_18_add_chain(self):
-        ''' Test add_chain function '''
+    def test_18_add_chain_failure(self):
+        ''' Test add_chain handles catastrophic failure '''
         self.library.client_ip = '3.4.5.6'
 
-        # First assume horrific failure:
         with mock.patch.object(self.library, 'chain_exists', side_effect=[True, True]), \
                 mock.patch.object(self.library, 'del_chain') as mock_delchain, \
                 mock.patch.object(self.library, 'send_event') as mock_logger:
@@ -168,7 +167,11 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         mock_delchain.assert_called_once_with()
         self.assertEqual(mock_logger.call_count, 2, 'Unremovable chain fails twice')
 
-        # Now, assume simple success:
+
+    def test_18_add_chain_simple_add_4(self):
+        ''' Test add_chain function, assume simple success in v4 '''
+        self.library.client_ip = '3.4.5.6'
+
         with mock.patch.object(self.library, 'chain_exists', return_value=False), \
                 mock.patch.object(self.library.nft, 'json_cmd') as mock_nft, \
                 mock.patch.object(self.library, 'get_acls_for_user',
@@ -198,7 +201,11 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                                        {'jump': {'target': '3.4.5.6'}}]}}},
         ]})
 
-        # Now, copy all that again but assume that we had to do housekeeping:
+
+    def test_18_add_chain_with_housekeeping_4(self):
+        ''' Test add_chain function, assume that we had to do housekeeping in v4 '''
+        self.library.client_ip = '3.4.5.6'
+
         with mock.patch.object(self.library, 'chain_exists', side_effect=[True, False]), \
                 mock.patch.object(self.library.nft, 'json_cmd') as mock_nft, \
                 mock.patch.object(self.library, 'del_chain') as mock_delchain, \
@@ -218,6 +225,11 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         # Not deep-checking the nft call; the above test should do that.
         mock_nft.assert_called_once()
         mock_block.assert_called_once_with()
+
+
+    def test_18_add_chain_with_failed_add_4(self):
+        ''' Test add_chain function with a failed add in v4'''
+        self.library.client_ip = '3.4.5.6'
 
         # One last time, but fail the add:
         with mock.patch.object(self.library, 'chain_exists', return_value=False), \
@@ -241,7 +253,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         # a weird situation and if you ever stumble over this, look at it closely.
 
 
-    def test_19_del_chain(self):
+    def test_19_del_chain_4(self):
         ''' Test del_chain function '''
         self.library.client_ip = '2.3.4.5'
 
@@ -332,7 +344,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         # or built tests for, because we've not seen them/thought of them.
 
 
-    def test_30_build_fw_rule(self):
+    def test_30_build_fw_rule_4(self):
         ''' Test _build_firewall_rule_nftables function '''
         self.library.username_is = 'bob'
 
@@ -340,11 +352,11 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             rule='', address=IPNetwork('5.6.7.8'), portstring='80', description='')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('chain1', '1.2.3.4', 'tcp', in_acl1)
+            self.library._build_firewall_rule_nftables('10.20.30.1', '1.2.3.4', 'tcp', in_acl1)
         mock_nft.assert_called_once_with({'nftables': [
             {'add': {'rule': {'family': 'inet',
                               'table': 'openvpn_netfilter',
-                              'chain': 'chain1',
+                              'chain': '10.20.30.1',
                               'comment': None,
                               'expr': [{'match': {
                                   'op': '==',
@@ -363,17 +375,17 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             mock_nft.return_value = (-1, '', 'someerror')
             with self.assertRaises(NftablesFailure,
                     msg='_build_firewall_rule_nftables raises when a rule add fails'):
-                self.library._build_firewall_rule_nftables('chain1', '1.2.3.4', 'tcp', in_acl1)
+                self.library._build_firewall_rule_nftables('10.20.30.1', '1.2.3.4', 'tcp', in_acl1)
 
         in_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='rule2', address=IPNetwork('5.6.7.9'), portstring='80', description='I HAZ COMMENT')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('chain2', '1.2.3.4', 'tcp', in_acl2)
+            self.library._build_firewall_rule_nftables('10.20.30.2', '1.2.3.4', 'tcp', in_acl2)
         mock_nft.assert_called_once_with({'nftables': [
             {'add': {'rule': {'family': 'inet',
                               'table': 'openvpn_netfilter',
-                              'chain': 'chain2',
+                              'chain': '10.20.30.2',
                               'comment': 'bob:rule2 ACL I HAZ COMMENT',
                               'expr': [{'match': {
                                   'op': '==',
@@ -393,11 +405,11 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             rule='', address=IPNetwork('5.6.7.0/24'), portstring='', description='')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('chain3', '1.2.3.4', '', ip_set_acl1)
+            self.library._build_firewall_rule_nftables('10.20.30.3', '1.2.3.4', '', ip_set_acl1)
         mock_nft.assert_called_once_with({'nftables': [
             {'add': {'element': {'family': 'inet',
                                  'table': 'openvpn_netfilter',
-                                 'name': 'chain3',
+                                 'name': '10.20.30.3',
                                  'elem': [ { 'prefix': {
                                      'addr': '5.6.7.0',
                                      'len': 24 } }
@@ -407,23 +419,31 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             mock_nft.return_value = (-1, '', 'someerror')
             with self.assertRaises(NftablesFailure,
                     msg='_build_firewall_rule_nftables raises when a set-element add fails'):
-                self.library._build_firewall_rule_nftables('chain3', '1.2.3.4', '', ip_set_acl1)
+                self.library._build_firewall_rule_nftables('10.20.30.3', '1.2.3.4', '', ip_set_acl1)
 
         # comments don't work in nftables sets, so "the output here is the same"
         ip_set_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='rule4', address=IPNetwork('5.6.7.11'), portstring='', description='IPSET SET SET')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('chain4', '1.2.3.4', '', ip_set_acl2)
+            self.library._build_firewall_rule_nftables('10.20.30.4', '1.2.3.4', '', ip_set_acl2)
         mock_nft.assert_called_once_with({'nftables': [
             {'add': {'element': {'family': 'inet',
                               'table': 'openvpn_netfilter',
-                              'name': 'chain4',
+                              'name': '10.20.30.4',
                               'elem': ['5.6.7.11'] }}}]})
 
+        # Don't let v6 ACLs into v4 chains
+        ip_set_acl3 = iamvpnlibrary.iamvpnbase.ParsedACL(
+            rule='rule8', address=IPNetwork('2001:db8:1:2:3:4:5:8'), portstring='', description='SOME SET')
+        with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
+            mock_nft.return_value = (0, '', '')
+            self.library._build_firewall_rule_nftables('10.20.30.4', '1.2.3.4', '', ip_set_acl3)
+        mock_nft.assert_not_called()
 
-    def test_31_create_rules(self):
-        ''' Test create_user_rules function '''
+
+    def test_31_create_rules_4(self):
+        ''' Test create_user_rules function in v4 '''
         self.library.username_is = 'larry'
         self.library.client_ip = '2.3.4.5'
 
@@ -431,6 +451,11 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             rule='rule2', address=IPNetwork('5.6.7.9'), portstring='80', description='I HAZ COMMENT')
         acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='rule4', address=IPNetwork('5.6.7.11'), portstring='', description='IPSET SET SET')
+        # Send in v6 ACLs, but since we're v4 they won't appear at the exit
+        acl3 = iamvpnlibrary.iamvpnbase.ParsedACL(
+            rule='rule6', address=IPNetwork('2001:db8:1:2:3:4:5:6'), portstring='80', description='MOAR COMMENTS')
+        acl4 = iamvpnlibrary.iamvpnbase.ParsedACL(
+            rule='rule8', address=IPNetwork('2001:db8:1:2:3:4:5:8'), portstring='', description='SOME SET')
 
         # Before we get too far into this, let's do the bad cases.
         # What if we can't make a chain/set for this person?
@@ -439,7 +464,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             mock_nft.return_value = (-1, '', '')
             with self.assertRaises(NftablesFailure,
                     msg='create_user_rules raises when creation fails early'):
-                self.library.create_user_rules([acl1, acl2])
+                self.library.create_user_rules([acl1, acl2, acl3, acl4])
 
         # What if we can make a chain/set for this person but then populating it fails?
         # skip going to _build_firewall_rule_nftables.. this failure check is to make sure
@@ -451,13 +476,13 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                                     (-1, '', '')]
             with self.assertRaises(NftablesFailure,
                     msg='create_user_rules raises when creation fails in the second phase'):
-                self.library.create_user_rules([acl1, acl2])
+                self.library.create_user_rules([acl1, acl2, acl3, acl4])
 
         # and now, the very complicated success route:
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft, \
                 mock.patch.object(self.library, '_ensure_nftables_framework') as mock_framework:
             mock_nft.return_value = (0, '', '')
-            self.library.create_user_rules([acl1, acl2])
+            self.library.create_user_rules([acl1, acl2, acl3, acl4])
         mock_framework.assert_called_once()
         # A lot just happened.  Time to check that nftables did the right things.
         # This is not necessarily written not in the order they were invoked.
@@ -657,8 +682,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         # IMPROVEME: needs bad tests
 
 
-    def test_add_safety(self):
-        ''' Test add_safety_block function '''
+    def test_add_safety_4(self):
+        ''' Test add_safety_block function in v4 '''
         self.library.client_ip = '10.20.30.40'
 
         # Assume an add works:
@@ -685,8 +710,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                 self.library.add_safety_block()
 
 
-    def test_del_safety(self):
-        ''' Test add_safety_block function '''
+    def test_del_safety_4(self):
+        ''' Test add_safety_block function in v4 '''
         self.library.client_ip = '20.30.40.50'
 
         good_rule_to_delete = {

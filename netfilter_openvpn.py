@@ -406,6 +406,10 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         """
         if self.nf_framework != 'iptables':  # pragma: no cover
             raise RuntimeError('invalid call into _build_firewall_rule_iptables')
+        if self.ip_family(name) != self.ip_family(acl.address):
+            # a v4 set can't take in v6 members, and vice versa
+            # We should maybe raise here
+            return
         comment = ''
         if acl.description:
             _commentstring = f'{self.username_is}:{acl.rule} ACL {acl.description}'
@@ -440,6 +444,10 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         """
         if self.nf_framework != 'nftables':  # pragma: no cover
             raise RuntimeError('invalid call into _build_firewall_rule_nftables')
+        if self.ip_family(name) != self.ip_family(acl.address):
+            # a v4 set can't take in v6 members, and vice versa
+            # We should maybe raise here
+            return
         if protocol and acl.portstring:
             dports = [int(x) for x in acl.portstring.split(',')]
             comment = None
