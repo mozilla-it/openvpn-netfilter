@@ -462,12 +462,14 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                     'expr': [
                         { 'match': {
                             'op': '==',
-                            'left': { 'payload': { 'protocol': 'ip', 'field': 'saddr' }},
+                            'left': { 'payload': { 'protocol': self.ip_family(usersrcip),
+                                                   'field': 'saddr' }},
                             'right': usersrcip,
                         }},
                         { 'match': {
                             'op': '==',
-                            'left': { 'payload': { 'protocol': 'ip', 'field': 'daddr' }},
+                            'left': { 'payload': { 'protocol': self.ip_family(acl.address),
+                                                   'field': 'daddr' }},
                             'right': str(acl.address),
                         }},
                         { 'match': {
@@ -486,7 +488,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                 raise NftablesFailure(f'rule add failed, ({error})')
         else:
             # set elements can't have comments in nftables
-            if len(acl.address) == 1:
+            if acl.address.size == 1:
                 # This is a single host.
                 elem_item = [ str(acl.address.network) ]
             else:
@@ -643,7 +645,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                         { 'match': {
                             'op': '==',
                             'left': { 'payload': {
-                                'protocol': 'ip',
+                                'protocol': self.ip_family(self.client_ip),
                                 'field': 'saddr'
                             }},
                             'right': self.client_ip,
@@ -651,7 +653,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                         { 'match': {
                             'op': '==',
                             'left': { 'payload': {
-                                'protocol': 'ip',
+                                'protocol': self.ip_family(chain),
                                 'field': 'daddr'
                             }},
                             # 'chain' is also the name of the set:
@@ -870,7 +872,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                         { 'match': {
                             'op': '==',
                             'left': { 'payload': {
-                                'protocol': 'ip',
+                                'protocol': self.ip_family(self.client_ip),
                                 'field': 'saddr'
                             }},
                             'right': self.client_ip,
@@ -923,7 +925,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             #            { 'match': {
             #                'op': '==',
             #                'left': { 'payload': {
-            #                    'protocol': 'ip',
+            #                    'protocol': self.ip_family(self.client_ip),
             #                    'field': 'saddr'
             #                }},
             #                'right': self.client_ip,
@@ -955,7 +957,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                 { 'match': {
                     'op': '==',
                     'left': { 'payload': {
-                        'protocol': 'ip',
+                        'protocol': self.ip_family(self.client_ip),
                         'field': 'saddr'
                     }},
                     'right': self.client_ip,
@@ -1077,7 +1079,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                         { 'match': {
                             'op': '==',
                             'left': { 'payload': {
-                                'protocol': 'ip',
+                                'protocol': self.ip_family(self.client_ip),
                                 'field': 'saddr'
                             }},
                             'right': self.client_ip,
@@ -1095,7 +1097,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                         { 'match': {
                             'op': '==',
                             'left': { 'payload': {
-                                'protocol': 'ip',
+                                'protocol': self.ip_family(self.client_ip),
                                 'field': 'daddr'
                             }},
                             'right': self.client_ip,
@@ -1160,7 +1162,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                 { 'match': {
                     'op': '==',
                     'left': { 'payload': {
-                        'protocol': 'ip',
+                        'protocol': self.ip_family(self.client_ip),
                         'field': 'saddr'
                     }},
                     'right': self.client_ip,
@@ -1171,7 +1173,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                 { 'match': {
                     'op': '==',
                     'left': { 'payload': {
-                        'protocol': 'ip',
+                        'protocol': self.ip_family(self.client_ip),
                         'field': 'daddr'
                     }},
                     'right': self.client_ip,
