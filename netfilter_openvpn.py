@@ -765,8 +765,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             if acl.address.version == 4:
                 pass
             elif acl.address.version == 6:
-                # IMPROVEME: handle ipv6 ; silent noop for now
-                continue
+                pass
             else:  # pragma: no cover
                 self.send_event(summary=(f'WARNING: unknown IP address, {acl.address} '
                                          f'version {acl.address.version}'),

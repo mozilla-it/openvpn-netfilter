@@ -300,7 +300,6 @@ class TestNetfilterOpenVPN(unittest.TestCase):
             self.assertEqual(self.library.get_acls_for_user(), [acl10, acl3])
 
         # collapsing of ranges with v6 in the mix.
-        # This test indicates the library doesn't support ipv6.  IMPROVEME
         with mock.patch.object(self.library.iam_object, 'get_allowed_vpn_acls',
                                return_value=[acl3, acl4, acl9, acl10, acl11, acl12]):
-            self.assertEqual(self.library.get_acls_for_user(), [acl10, acl3])
+            self.assertEqual(self.library.get_acls_for_user(), [acl10, acl3, acl12])
