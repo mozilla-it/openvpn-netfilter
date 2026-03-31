@@ -151,25 +151,25 @@ class TestNetfilterOpenVPN(unittest.TestCase):
 
     def test_11_acquire_lock_simple(self):
         ''' test the acquire_lock function when there's no hiccups '''
-        tmpfile = tempfile.NamedTemporaryFile()
-        self.library.lockpath = tmpfile.name
-        self.assertIsNone(self.library._lock)
-        self.assertTrue(self.library.acquire_lock())
-        self.assertIsNotNone(self.library._lock)
-        # Better test: is a file object ^
-        self.assertTrue(self.library.free_lock())
-        self.assertIsNone(self.library._lock)
+        with tempfile.NamedTemporaryFile() as tmpfile:
+            self.library.lockpath = tmpfile.name
+            self.assertIsNone(self.library._lock)
+            self.assertTrue(self.library.acquire_lock())
+            self.assertIsNotNone(self.library._lock)
+            # Better test: is a file object ^
+            self.assertTrue(self.library.free_lock())
+            self.assertIsNone(self.library._lock)
 
     def test_12_acquire_lock_failure(self):
         ''' test the acquire_lock function when things go badly '''
-        tmpfile = tempfile.NamedTemporaryFile()
-        self.library.lockpath = tmpfile.name
-        self.assertIsNone(self.library._lock)
-        with mock.patch('fcntl.flock', side_effect=IOError), \
-                mock.patch.object(self.library, 'send_event') as mock_logger:
-            self.assertFalse(self.library.acquire_lock())
-        # Lock failure triggers an event:
-        mock_logger.assert_called_once()
+        with tempfile.NamedTemporaryFile() as tmpfile:
+            self.library.lockpath = tmpfile.name
+            self.assertIsNone(self.library._lock)
+            with mock.patch('fcntl.flock', side_effect=IOError), \
+                    mock.patch.object(self.library, 'send_event') as mock_logger:
+                self.assertFalse(self.library.acquire_lock())
+            # Lock failure triggers an event:
+            mock_logger.assert_called_once()
 
     def test_13_log_event_nosend(self):
         ''' Test the send_event method failing to send '''
@@ -183,7 +183,9 @@ class TestNetfilterOpenVPN(unittest.TestCase):
     def test_14_log_event_send(self):
         ''' Test the send_event method tries to send '''
         datetime_mock = mock.Mock(wraps=datetime.datetime)
-        datetime_mock.now.return_value = datetime.datetime(2020, 12, 25, 13, 14, 15, 123456, tzinfo=datetime.timezone.utc)
+        datetime_mock.now.return_value = datetime.datetime(2020, 12, 25,
+                                                           13, 14, 15, 123456,
+                                                           tzinfo=datetime.timezone.utc)
         self.library.event_send = True
         self.library.event_facility = syslog.LOG_LOCAL1
         with mock.patch('syslog.openlog') as mock_openlog, \

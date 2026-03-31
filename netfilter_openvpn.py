@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """
     This is a librarification of the commands that should add/delete
     netfilter rules for someone connecting to OpenVPN.  This applies
@@ -89,7 +90,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                              '/usr/local/etc/netfilter_openvpn.conf',
                              '/etc/netfilter_openvpn.conf']
 
-    def __init__(self):
+    def __init__(self):  # pylint: disable=too-many-branches,too-many-statements
         """
             ingest the config file, then
             establish our variables based on it.
@@ -509,7 +510,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                 # IMPROVEME: this add shouldn't fail, we should log more about it.
                 raise NftablesFailure(f'set add failed, ({error})')
 
-    def create_user_rules(self, user_acls):
+    def create_user_rules(self, user_acls):  # pylint: disable=too-many-branches,too-many-locals
         """
             Given the ACLs for a particular user, create the rules that will
             limit their access
@@ -1116,7 +1117,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         self.remove_safety_block()
         return True
 
-    def del_chain(self):
+    def del_chain(self):  # pylint: disable=too-many-locals
         """
             Delete the custom chain and all associated rules
 

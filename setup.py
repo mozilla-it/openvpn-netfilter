@@ -29,9 +29,8 @@ def git_version():
         env['LANGUAGE'] = 'C'
         env['LANG'] = 'C'
         env['LC_ALL'] = 'C'
-        out = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                               env=env).communicate()[0]
-        return out
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE, env=env) as gitcmd:
+            return gitcmd.communicate()[0]
 
     try:
         out = _minimal_ext_cmd(['git', 'rev-parse', 'HEAD'])
@@ -41,6 +40,9 @@ def git_version():
 
     return git_revision
 
+
+with open('README.rst', 'r', encoding='utf-8') as readme_fh:
+    long_description = readme_fh.read()
 
 setup(
     name='openvpn-netfilter',
@@ -54,7 +56,7 @@ setup(
     license='MPL',
     keywords="vpn netfilter",
     url="https://github.com/mozilla-it/openvpn-netfilter",
-    long_description=open('README.rst', 'r', encoding='utf-8').read(),
+    long_description=long_description,
     install_requires=['iamvpnlibrary>=0.9.0'],
     classifiers=[
         "Development Status :: 5 - Production/Stable",

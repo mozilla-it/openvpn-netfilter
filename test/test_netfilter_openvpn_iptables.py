@@ -305,14 +305,16 @@ class TestNetfilterOpenVPNiptables(unittest.TestCase):
         iptables_acl1 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='', address='5.6.7.8', portstring='80', description='')
         with mock.patch.object(self.library, 'iptables') as mock_ipt:
-            self.library._build_firewall_rule_iptables('10.20.30.1', '1.2.3.4', 'tcp', iptables_acl1)
+            self.library._build_firewall_rule_iptables('10.20.30.1', '1.2.3.4',
+                                                       'tcp', iptables_acl1)
         mock_ipt.assert_called_once_with(('-A 10.20.30.1 -s 1.2.3.4 -d 5.6.7.8 -p tcp '
                                           '-m multiport --dports 80  -j ACCEPT'))
 
         iptables_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='rule2', address='5.6.7.9', portstring='80', description='I HAZ COMMENT')
         with mock.patch.object(self.library, 'iptables') as mock_ipt:
-            self.library._build_firewall_rule_iptables('10.20.30.2', '1.2.3.4', 'tcp', iptables_acl2)
+            self.library._build_firewall_rule_iptables('10.20.30.2', '1.2.3.4',
+                                                       'tcp', iptables_acl2)
         mock_ipt.assert_called_once_with(('-A 10.20.30.2 -s 1.2.3.4 -d 5.6.7.9 -p tcp -m multiport '
                                           '--dports 80 -m comment '
                                           '--comment "bob:rule2 ACL I HAZ COMMENT" '
@@ -328,7 +330,8 @@ class TestNetfilterOpenVPNiptables(unittest.TestCase):
             rule='rule4', address='5.6.7.11', portstring='', description='IPSET SET SET')
         with mock.patch.object(self.library, 'ipset') as mock_ips:
             self.library._build_firewall_rule_iptables('10.20.30.4', '1.2.3.4', '', ipset_acl2)
-        mock_ips.assert_called_once_with('--add 10.20.30.4 5.6.7.11 comment "bob:rule4 ACL IPSET SET SET"')
+        mock_ips.assert_called_once_with('--add 10.20.30.4 5.6.7.11 comment '
+                                         '"bob:rule4 ACL IPSET SET SET"')
 
         # Don't let v6 ACLs into v4 chains
         ip_set_acl3 = iamvpnlibrary.iamvpnbase.ParsedACL(

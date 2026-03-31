@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 '''
    tests that are specific to nftables
 '''
@@ -29,27 +30,10 @@ class TestExceptionsnftables(unittest.TestCase):
                               'NftablesFailure is not an Exception')
 
 
-class TestNetfilterOpenVPNnftables(unittest.TestCase):
+class TestVariableIngestion(unittest.TestCase):
     '''
-        Test the NetfilterOpenVPN class against nftables.
+        Test the NetfilterOpenVPN class against nftables, with file ingestion
     '''
-
-    def setUp(self):
-        # We create a library that pretends it was done by root.
-        # If you notice in the module, this exists as a simple early filter and prevents scripts
-        # from going into cases where root is needed.  Since we're mocking here, the worry is
-        # "well, now you can get into situations where you wouldn't otherwise.
-        # True, but that's the point.
-        test_reading_file = '/tmp/test-reader.txt'  # nosec hardcoded_tmp_directory
-        with open(test_reading_file, 'w', encoding='utf-8') as filepointer:
-            filepointer.write('[openvpn-netfilter]\n')
-            filepointer.write('framework = nftables\n')
-        filepointer.close()
-        with mock.patch.object(NetfilterOpenVPN, 'CONFIG_FILE_LOCATIONS',
-                               new=[test_reading_file]), \
-                mock.patch('os.geteuid', return_value=0):
-            self.library = NetfilterOpenVPN()
-
 
     def test_07a_ingest_variables_bad(self):
         """ With a poor config file, check we get the right things. """
@@ -100,6 +84,28 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         self.assertEqual(library.lockretriesmax, 12)
         self.assertEqual(library.event_send, True)
         self.assertEqual(library.event_facility, syslog.LOG_LOCAL0)
+
+
+class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-many-public-methods
+    '''
+        Test the NetfilterOpenVPN class against nftables.
+    '''
+
+    def setUp(self):
+        # We create a library that pretends it was done by root.
+        # If you notice in the module, this exists as a simple early filter and prevents scripts
+        # from going into cases where root is needed.  Since we're mocking here, the worry is
+        # "well, now you can get into situations where you wouldn't otherwise.
+        # True, but that's the point.
+        test_reading_file = '/tmp/test-reader.txt'  # nosec hardcoded_tmp_directory
+        with open(test_reading_file, 'w', encoding='utf-8') as filepointer:
+            filepointer.write('[openvpn-netfilter]\n')
+            filepointer.write('framework = nftables\n')
+        filepointer.close()
+        with mock.patch.object(NetfilterOpenVPN, 'CONFIG_FILE_LOCATIONS',
+                               new=[test_reading_file]), \
+                mock.patch('os.geteuid', return_value=0):
+            self.library = NetfilterOpenVPN()
 
 
     def test_16_chain_exists_deeptest(self):
@@ -189,14 +195,16 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                               'table': 'openvpn_netfilter',
                               'chain': 'FORWARD',
                               'expr': [{'match': {'op': '==',
-                                                  'left': {'payload': {'protocol': 'ip', 'field': 'saddr'}},
+                                                  'left': {'payload': {'protocol': 'ip',
+                                                                       'field': 'saddr'}},
                                                   'right': '3.4.5.6'}},
                                        {'jump': {'target': '3.4.5.6'}}]}}},
             {'add': {'rule': {'family': 'inet',
                               'table': 'openvpn_netfilter',
                               'chain': 'FORWARD',
                               'expr': [{'match': {'op': '==',
-                                                  'left': {'payload': {'protocol': 'ip', 'field': 'daddr'}},
+                                                  'left': {'payload': {'protocol': 'ip',
+                                                                       'field': 'daddr'}},
                                                   'right': '3.4.5.6'}},
                                        {'jump': {'target': '3.4.5.6'}}]}}},
         ]})
@@ -223,14 +231,16 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                               'table': 'openvpn_netfilter',
                               'chain': 'FORWARD',
                               'expr': [{'match': {'op': '==',
-                                                  'left': {'payload': {'protocol': 'ip6', 'field': 'saddr'}},
+                                                  'left': {'payload': {'protocol': 'ip6',
+                                                                       'field': 'saddr'}},
                                                   'right': self.library.client_ip}},
                                        {'jump': {'target': self.library.client_ip}}]}}},
             {'add': {'rule': {'family': 'inet',
                               'table': 'openvpn_netfilter',
                               'chain': 'FORWARD',
                               'expr': [{'match': {'op': '==',
-                                                  'left': {'payload': {'protocol': 'ip6', 'field': 'daddr'}},
+                                                  'left': {'payload': {'protocol': 'ip6',
+                                                                       'field': 'daddr'}},
                                                   'right': self.library.client_ip}},
                                        {'jump': {'target': self.library.client_ip}}]}}},
         ]})
@@ -554,7 +564,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                 self.library._build_firewall_rule_nftables('10.20.30.1', '1.2.3.4', 'tcp', in_acl1)
 
         in_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule2', address=IPNetwork('5.6.7.9'), portstring='80', description='I HAZ COMMENT')
+            rule='rule2', address=IPNetwork('5.6.7.9'),
+            portstring='80', description='I HAZ COMMENT')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
             self.library._build_firewall_rule_nftables('10.20.30.2', '1.2.3.4', 'tcp', in_acl2)
@@ -611,7 +622,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
 
         # Don't let v6 ACLs into v4 chains
         ip_set_acl3 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule8', address=IPNetwork('2001:db8:1:2:3:4:5:8'), portstring='', description='SOME SET')
+            rule='rule8', address=IPNetwork('2001:db8:1:2:3:4:5:8'),
+            portstring='', description='SOME SET')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
             self.library._build_firewall_rule_nftables('10.20.30.4', '1.2.3.4', '', ip_set_acl3)
@@ -626,7 +638,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             rule='', address=IPNetwork('2001:db8::5:6:7:8'), portstring='80', description='')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:1', '2001:db8::1:2:3:4', 'tcp', in_acl1)
+            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:1',
+                                                       '2001:db8::1:2:3:4', 'tcp', in_acl1)
         mock_nft.assert_called_once_with({'nftables': [
             {'add': {'rule': {'family': 'inet',
                               'table': 'openvpn_netfilter',
@@ -649,13 +662,16 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             mock_nft.return_value = (-1, '', 'someerror')
             with self.assertRaises(NftablesFailure,
                     msg='_build_firewall_rule_nftables raises when a rule add fails'):
-                self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:1', '2001:db8::1:2:3:4', 'tcp', in_acl1)
+                self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:1',
+                                                           '2001:db8::1:2:3:4', 'tcp', in_acl1)
 
         in_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule2', address=IPNetwork('2001:db8::5:6:7:9'), portstring='80', description='I HAZ COMMENT')
+            rule='rule2', address=IPNetwork('2001:db8::5:6:7:9'),
+            portstring='80', description='I HAZ COMMENT')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:2', '2001:db8::1:2:3:4', 'tcp', in_acl2)
+            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:2',
+                                                       '2001:db8::1:2:3:4', 'tcp', in_acl2)
         mock_nft.assert_called_once_with({'nftables': [
             {'add': {'rule': {'family': 'inet',
                               'table': 'openvpn_netfilter',
@@ -679,7 +695,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             rule='', address=IPNetwork('2001:db8::5:6:7:0/112'), portstring='', description='')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:3', '2001:db8::1:2:3:4', '', ip_set_acl1)
+            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:3',
+                                                       '2001:db8::1:2:3:4', '', ip_set_acl1)
         mock_nft.assert_called_once_with({'nftables': [
             {'add': {'element': {'family': 'inet',
                                  'table': 'openvpn_netfilter',
@@ -693,14 +710,17 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             mock_nft.return_value = (-1, '', 'someerror')
             with self.assertRaises(NftablesFailure,
                     msg='_build_firewall_rule_nftables raises when a set-element add fails'):
-                self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:3', '2001:db8::1:2:3:4', '', ip_set_acl1)
+                self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:3',
+                                                           '2001:db8::1:2:3:4', '', ip_set_acl1)
 
         # comments don't work in nftables sets, so "the output here is the same"
         ip_set_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule4', address=IPNetwork('2001:db8::5:6:7:11'), portstring='', description='IPSET SET SET')
+            rule='rule4', address=IPNetwork('2001:db8::5:6:7:11'), portstring='',
+            description='IPSET SET SET')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:4', '2001:db8::1:2:3:4', '', ip_set_acl2)
+            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:4',
+                                                       '2001:db8::1:2:3:4', '', ip_set_acl2)
         mock_nft.assert_called_once_with({'nftables': [
             {'add': {'element': {'family': 'inet',
                               'table': 'openvpn_netfilter',
@@ -712,7 +732,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
             rule='rule4', address=IPNetwork('5.6.7.11'), portstring='', description='IPSET SET SET')
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (0, '', '')
-            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:4', '2001:db8::1:2:3:4', '', ip_set_acl3)
+            self.library._build_firewall_rule_nftables('2001:db8:3:4:5:6:7:4',
+                                                       '2001:db8::1:2:3:4', '', ip_set_acl3)
         mock_nft.assert_not_called()
 
 
@@ -722,14 +743,18 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         self.library.client_ip = '2.3.4.5'
 
         acl1 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule2', address=IPNetwork('5.6.7.9'), portstring='80', description='I HAZ COMMENT')
+            rule='rule2', address=IPNetwork('5.6.7.9'), portstring='80',
+            description='I HAZ COMMENT')
         acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule4', address=IPNetwork('5.6.7.11'), portstring='', description='IPSET SET SET')
+            rule='rule4', address=IPNetwork('5.6.7.11'), portstring='',
+            description='IPSET SET SET')
         # Send in v6 ACLs, but since we're v4 they won't appear at the exit
         acl3 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule6', address=IPNetwork('2001:db8:1:2:3:4:5:6'), portstring='80', description='MOAR COMMENTS')
+            rule='rule6', address=IPNetwork('2001:db8:1:2:3:4:5:6'), portstring='80',
+            description='MOAR COMMENTS')
         acl4 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule8', address=IPNetwork('2001:db8:1:2:3:4:5:8'), portstring='', description='SOME SET')
+            rule='rule8', address=IPNetwork('2001:db8:1:2:3:4:5:8'), portstring='',
+            description='SOME SET')
 
         # Before we get too far into this, let's do the bad cases.
         # What if we can't make a chain/set for this person?
@@ -898,13 +923,17 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
 
         # Send in v4 ACLs, but since we're v6 they won't appear at the exit
         acl1 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule2', address=IPNetwork('5.6.7.9'), portstring='80', description='I HAZ COMMENT')
+            rule='rule2', address=IPNetwork('5.6.7.9'), portstring='80',
+            description='I HAZ COMMENT')
         acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule4', address=IPNetwork('5.6.7.11'), portstring='', description='IPSET SET SET')
+            rule='rule4', address=IPNetwork('5.6.7.11'), portstring='',
+            description='IPSET SET SET')
         acl3 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule6', address=IPNetwork('2001:db8:1:2:3:4:5:6'), portstring='80', description='MOAR COMMENTS')
+            rule='rule6', address=IPNetwork('2001:db8:1:2:3:4:5:6'), portstring='80',
+            description='MOAR COMMENTS')
         acl4 = iamvpnlibrary.iamvpnbase.ParsedACL(
-            rule='rule8', address=IPNetwork('2001:db8:1:2:3:4:5:8'), portstring='', description='SOME SET')
+            rule='rule8', address=IPNetwork('2001:db8:1:2:3:4:5:8'), portstring='',
+            description='SOME SET')
 
         # Before we get too far into this, let's do the bad cases.
         # What if we can't make a chain/set for this person?
@@ -1145,7 +1174,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                               'table': 'openvpn_netfilter',
                               'chain': 'FORWARD',
                               'expr': [{'match': {'op': '==',
-                                                  'left': {'payload': {'protocol': 'ip', 'field': 'saddr'}},
+                                                  'left': {'payload': {'protocol': 'ip',
+                                                                       'field': 'saddr'}},
                                                   'right': '10.20.30.40'}},
                                         {'drop': None}]}}}]})
         self.assertTrue(res, 'add_safety_block shoule be true on success')
@@ -1173,7 +1203,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
                               'table': 'openvpn_netfilter',
                               'chain': 'FORWARD',
                               'expr': [{'match': {'op': '==',
-                                                  'left': {'payload': {'protocol': 'ip6', 'field': 'saddr'}},
+                                                  'left': {'payload': {'protocol': 'ip6',
+                                                                       'field': 'saddr'}},
                                                   'right': self.library.client_ip}},
                                         {'drop': None}]}}}]})
         self.assertTrue(res, 'add_safety_block shoule be true on success')
@@ -1232,7 +1263,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         #                         'table': 'openvpn_netfilter',
         #                         'chain': 'FORWARD',
         #                         'expr': [{'match': {'op': '==',
-        #                                             'left': {'payload': {'protocol': 'ip', 'field': 'saddr'}},
+        #                                             'left': {'payload': {'protocol': 'ip',
+        #                                                                  'field': 'saddr'}},
         #                                             'right': '20.30.40.50'}},
         #                                   {'drop': None}]}}}]})
 
@@ -1319,7 +1351,8 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):
         #                         'table': 'openvpn_netfilter',
         #                         'chain': 'FORWARD',
         #                         'expr': [{'match': {'op': '==',
-        #                                             'left': {'payload': {'protocol': 'ip6', 'field': 'saddr'}},
+        #                                             'left': {'payload': {'protocol': 'ip6',
+        #                                                                  'field': 'saddr'}},
         #                                             'right': self.library.client_ip}},
         #                                   {'drop': None}]}}}]})
 
