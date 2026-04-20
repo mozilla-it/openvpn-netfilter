@@ -454,6 +454,13 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             comment = None
             if acl.description:
                 comment = f'{self.username_is}:{acl.rule} ACL {acl.description}'
+            if acl.address.size == 1:
+                # Oddly, if you say "/32" here, it gets cranky over json because that
+                # would be a prefix.
+                right_side = str(acl.address.ip)
+            else:
+                # This is a rare case and we haven't tested it fully, come back later.
+                right_side = {"prefix": {"addr": str(acl.address.ip), "len": acl.prefixlen}}
             rule_def = {
                 'rule': {
                     'family': 'inet',
@@ -471,7 +478,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                             'op': '==',
                             'left': { 'payload': { 'protocol': self.ip_family(acl.address),
                                                    'field': 'daddr' }},
-                            'right': str(acl.address),
+                            'right': right_side,
                         }},
                         { 'match': {
                             'op': '==',

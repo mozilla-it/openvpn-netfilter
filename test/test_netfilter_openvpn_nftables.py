@@ -551,7 +551,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                                        {'match': {
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'ip', 'field': 'daddr'}},
-                                  'right': '5.6.7.8/32'}},
+                                  'right': '5.6.7.8'}},
                                        {'match': {
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'tcp', 'field': 'dport'}},
@@ -581,7 +581,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                                        {'match': {
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'ip', 'field': 'daddr'}},
-                                  'right': '5.6.7.9/32'}},
+                                  'right': '5.6.7.9'}},
                                        {'match': {
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'tcp', 'field': 'dport'}},
@@ -652,7 +652,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                                        {'match': {
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'ip6', 'field': 'daddr'}},
-                                  'right': '2001:db8::5:6:7:8/128'}},
+                                  'right': '2001:db8::5:6:7:8'}},
                                        {'match': {
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'tcp', 'field': 'dport'}},
@@ -684,7 +684,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                                        {'match': {
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'ip6', 'field': 'daddr'}},
-                                  'right': '2001:db8::5:6:7:9/128'}},
+                                  'right': '2001:db8::5:6:7:9'}},
                                        {'match': {
                                   'op': '==',
                                   'left': {'payload': { 'protocol': 'tcp', 'field': 'dport'}},
@@ -890,7 +890,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                         {'match': {
                             'op': '==',
                             'left': {'payload': {'protocol': 'ip', 'field': 'daddr'}},
-                            'right': '5.6.7.9/32'}
+                            'right': '5.6.7.9'}
                         },
                         {'match': {
                             'op': '==',
@@ -1069,7 +1069,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                         {'match': {
                             'op': '==',
                             'left': {'payload': {'protocol': 'ip6', 'field': 'daddr'}},
-                            'right': '2001:db8:1:2:3:4:5:6/128'}
+                            'right': '2001:db8:1:2:3:4:5:6'}
                         },
                         {'match': {
                             'op': '==',
