@@ -460,7 +460,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                 right_side = str(acl.address.ip)
             else:
                 # This is a rare case and we haven't tested it fully, come back later.
-                right_side = {"prefix": {"addr": str(acl.address.ip), "len": acl.prefixlen}}
+                right_side = {"prefix": {"addr": str(acl.address.ip), "len": acl.address.prefixlen}}
             rule_def = {
                 'rule': {
                     'family': 'inet',

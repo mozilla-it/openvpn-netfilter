@@ -563,6 +563,31 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                     msg='_build_firewall_rule_nftables raises when a rule add fails'):
                 self.library._build_firewall_rule_nftables('10.20.30.1', '1.2.3.4', 'tcp', in_acl1)
 
+        in_acl3 = iamvpnlibrary.iamvpnbase.ParsedACL(
+            rule='rule3', address=IPNetwork('5.6.7.10/28'),
+            portstring='22', description='I HAZ COMMENT')
+        with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
+            mock_nft.return_value = (0, '', '')
+            self.library._build_firewall_rule_nftables('10.20.30.2', '1.2.3.4', 'tcp', in_acl3)
+        mock_nft.assert_called_once_with({'nftables': [
+            {'add': {'rule': {'family': 'inet',
+                              'table': 'openvpn_netfilter',
+                              'chain': '10.20.30.2',
+                              'comment': 'bob:rule3 ACL I HAZ COMMENT',
+                              'expr': [{'match': {
+                                  'op': '==',
+                                  'left': {'payload': { 'protocol': 'ip', 'field': 'saddr'}},
+                                  'right': '1.2.3.4'}},
+                                       {'match': {
+                                  'op': '==',
+                                  'left': {'payload': { 'protocol': 'ip', 'field': 'daddr'}},
+                                  'right': {'prefix': {'addr': '5.6.7.10', 'len': 28}}}},
+                                       {'match': {
+                                  'op': '==',
+                                  'left': {'payload': { 'protocol': 'tcp', 'field': 'dport'}},
+                                  'right': {'set': [22]}}},
+                                       {'accept': None}]}}}]})
+
         in_acl2 = iamvpnlibrary.iamvpnbase.ParsedACL(
             rule='rule2', address=IPNetwork('5.6.7.9'),
             portstring='80', description='I HAZ COMMENT')
