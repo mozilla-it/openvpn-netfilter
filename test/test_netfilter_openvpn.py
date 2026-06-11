@@ -230,6 +230,21 @@ class TestNetfilterOpenVPN(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.library.ip_family('not-an-ip')
 
+    def test_20_ip_set_type_4(self):
+        ''' Make sure we get good ip_set_type strings from ipv4 '''
+        self.assertEqual(self.library.ip_set_type('10.20.30.40'), 'ipv4_addr')
+        self.assertEqual(self.library.ip_set_type(IPAddress('10.20.30.40')), 'ipv4_addr')
+
+    def test_20_ip_set_type_6(self):
+        ''' Make sure we get good ip_set_type strings from ipv6 '''
+        self.assertEqual(self.library.ip_set_type('2001:db8::4'), 'ipv6_addr')
+        self.assertEqual(self.library.ip_set_type(IPAddress('2001:db8::4:5')), 'ipv6_addr')
+
+    def test_20_ip_set_type_fail(self):
+        ''' Make sure we blow up ip_set_type with bad strings '''
+        with self.assertRaises(ValueError):
+            self.library.ip_set_type('not-an-ip')
+
     def test_35_get_acls(self):
         ''' Test get_acls_for_user function '''
         self.library.username_is = 'joe'

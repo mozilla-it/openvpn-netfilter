@@ -193,6 +193,24 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
         raise ValueError(f'IP {ip_in} is not ipv4 or ipv6')  # pragma: no cover
 
 
+    @staticmethod
+    def ip_set_type(ip_in):
+        '''
+            Find the nftables address family of an IP
+        '''
+        try:
+            if not isinstance(ip_in, netaddr.IPNetwork):
+                ip_in = netaddr.IPNetwork(ip_in)
+        except netaddr.core.AddrFormatError as exc:
+            raise ValueError(f'IP {ip_in} is not an IP address') from exc
+        else:
+            if ip_in.ip.version == 4:
+                return 'ipv4_addr'
+            if ip_in.ip.version == 6:
+                return 'ipv6_addr'
+        raise ValueError(f'IP {ip_in} is not ipv4 or ipv6')  # pragma: no cover
+
+
     def send_event(self, summary, details, severity='INFO'):
         '''
             Send an event to our syslog setting, if set
