@@ -598,8 +598,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                 'set': {
                     'family': 'inet',
                     'table': self.nftables_table,
-                    # CAUTION: v4-only here:
-                    'type': 'ipv4_addr',
+                    'type': self.ip_set_type(chain),
                     'name': chain,
                     # flags interval means the set can contain CIDRs
                     'flags': [ 'interval' ],
@@ -1244,8 +1243,7 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
                 'set': {
                     'family': 'inet',
                     'table': self.nftables_table,
-                    # CAUTION: v4-only here:
-                    'type': 'ipv4_addr',
+                    'type': self.ip_set_type(chain),
                     'name': chain,
                 }
             }

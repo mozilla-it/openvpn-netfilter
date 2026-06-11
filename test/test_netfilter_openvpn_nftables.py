@@ -514,7 +514,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                                   'name': self.library.client_ip,}}},
             {'delete': {'set': {'family': 'inet',
                                 'table': 'openvpn_netfilter',
-                                'type': 'ipv4_addr',
+                                'type': 'ipv6_addr',
                                 'name': self.library.client_ip,}}},
         ]})
 
@@ -1004,7 +1004,7 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
                 'set': {
                     'family': 'inet',
                     'table': 'openvpn_netfilter',
-                    'type': 'ipv4_addr',
+                    'type': 'ipv6_addr',
                     'name': self.library.client_ip,
                     'flags': ['interval']
                     }
