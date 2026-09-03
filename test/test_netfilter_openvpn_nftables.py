@@ -1325,10 +1325,9 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
         # Assume a list blows out, SOMEHOW:
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (-1, '{}', '')
-            with self.assertRaises(NftablesFailure,
-                    msg='delete_safety_block should raise on a botched lookup'):
-                self.library.remove_safety_block()
-            # Not checking the call; the above test should do that.
+            res = self.library.remove_safety_block()
+        self.assertTrue(res, 'remove_safety_block shoule be True on no-table-found')
+        # Not checking the call; the above test should do that.
 
 
     def test_del_safety_6(self):
@@ -1413,7 +1412,6 @@ class TestNetfilterOpenVPNnftables(unittest.TestCase):  # pylint: disable=too-ma
         # Assume a list blows out, SOMEHOW:
         with mock.patch.object(self.library.nft, 'json_cmd') as mock_nft:
             mock_nft.return_value = (-1, '{}', '')
-            with self.assertRaises(NftablesFailure,
-                    msg='delete_safety_block should raise on a botched lookup'):
-                self.library.remove_safety_block()
-            # Not checking the call; the above test should do that.
+            res = self.library.remove_safety_block()
+        self.assertTrue(res, 'remove_safety_block shoule be True on no-table-found')
+        # Not checking the call; the above test should do that.

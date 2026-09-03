@@ -970,13 +970,13 @@ class NetfilterOpenVPN:  # pylint: disable=too-many-instance-attributes
             nft_rc, output, error = self.nft.json_cmd(list_cmd)
             if nft_rc != 0:
                 # If you don't get any rules back from the FORWARD chain, you
-                # kinda have to assume everything is busted.  I mean, this is not
-                # a complex search here that should ever fail.  So you're into
-                # edge cases like "out of memory" or "all of the table got deleted
-                # by a rogue actor.  At that point everything is suspect so even
-                # though we're aborting early and not looking for the user's
-                # chain+set, we're already so busted it's not tenable.
-                raise NftablesFailure(f'failed to list safety block ({error})')
+                # would think everything is busted.  I mean, this is not a
+                # search here that should ever fail, so you'd think you're into
+                # edge cases like "out of memory."  While that might be true,
+                # the real one here is "the table got deleted on shutdown."
+                # Since it's about "delete a line" and technically that has
+                # happened, even if not by our hand, call it good.
+                return True
             expr_def = [
                 { 'match': {
                     'op': '==',
